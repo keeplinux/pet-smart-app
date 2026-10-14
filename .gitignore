@@ -16,6 +16,15 @@ dist-ssr
 # Local AI usage logs (token records, not project source)
 dsh-usage/
 
+# Android signing secrets and build outputs
+android/keystore.properties
+*.keystore
+!debug.keystore
+android/.gradle/
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
