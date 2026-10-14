@@ -1,11 +1,14 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AppContext } from './appContext'
 import type { AppApi } from './appContext'
-import { kindForProduct } from './catalog'
-import type { Device, Pet, Product, View } from './nav'
+import { clearStoredAccount, readStoredAccount, storeAccount } from './auth'
+import type { Account, Device, DeviceInput, Pet, View } from './nav'
+import { buildDevice } from './provisioning'
+import { clearStoredDevices, readStoredDevices, storeDevices } from './storage'
 import { DeviceView } from './views/Device'
 import { Home } from './views/Home'
+import { HotspotBindView } from './views/HotspotBind'
 import { Mall } from './views/Mall'
 import { PetCapture } from './views/PetCapture'
 import { PurchaseView } from './views/Purchase'
@@ -14,7 +17,14 @@ import { SettingsView } from './views/Settings'
 import { Splash } from './views/Splash'
 
 const initialDevices: Device[] = [
-  { id: 'water-1', kind: 'water', productId: 'smart-water', name: '宠物暖泉', online: true },
+  buildDevice({
+    productId: 'smart-water',
+    sn: 'PF24050007',
+    mac: 'A4:C1:38:2B:71:0C',
+    wifiSsid: 'Silifield-Office',
+    status: 'bound',
+    source: 'scan',
+  }),
 ]
 
 function renderView(view: View): ReactNode {
@@ -29,6 +39,10 @@ function renderView(view: View): ReactNode {
       return <PurchaseView productId={view.productId} />
     case 'scan':
       return <ScanView />
+    case 'hotspot':
+      return <HotspotBindView />
+    case 'provision':
+      return <ScanView initialPayload={view.payload} source={view.source} />
     case 'settings':
       return <SettingsView />
     case 'device':
@@ -41,25 +55,34 @@ function renderView(view: View): ReactNode {
 }
 
 function App() {
-  const [view, setView] = useState<View>({ name: 'splash' })
-  const [devices, setDevices] = useState<Device[]>(initialDevices)
+  const [account, setAccount] = useState<Account | null>(() => readStoredAccount())
+  const [view, setView] = useState<View>(() => (readStoredAccount() ? { name: 'home' } : { name: 'splash' }))
+  const [devices, setDevices] = useState<Device[]>(() => readStoredDevices(initialDevices))
   const [pets, setPets] = useState<Pet[]>([])
 
   const navigate = useCallback((next: View) => setView(next), [])
 
-  const addDevice = useCallback((product: Product) => {
+  const addDevice = useCallback((input: DeviceInput) => {
     setDevices((prev) => {
-      if (prev.some((device) => device.productId === product.id)) {
+      const index = prev.findIndex((device) => device.sn === input.sn)
+      if (index === -1) {
+        return [...prev, buildDevice(input)]
+      }
+      const current = prev[index]
+      // 已配网设备不会被保底探测降级为待配网
+      if (current.status === 'bound' && input.status === 'pending') {
         return prev
       }
-      const device: Device = {
-        id: `${product.id}-${Date.now()}`,
-        kind: kindForProduct(product.id),
-        productId: product.id,
-        name: product.name,
-        online: true,
+      if (
+        current.status === input.status &&
+        current.wifiSsid === input.wifiSsid &&
+        current.source === input.source
+      ) {
+        return prev
       }
-      return [...prev, device]
+      const next = [...prev]
+      next[index] = { ...buildDevice(input), boundAt: current.boundAt }
+      return next
     })
   }, [])
 
@@ -71,14 +94,43 @@ function App() {
     setPets((prev) => [...prev, next])
   }, [])
 
+  const signIn = useCallback((next: Account) => {
+    storeAccount(next)
+    setAccount(next)
+    setView({ name: 'home' })
+  }, [])
+
+  const signOut = useCallback(() => {
+    clearStoredAccount()
+    clearStoredDevices()
+    setAccount(null)
+    setView({ name: 'splash' })
+  }, [])
+
+  // 配网结果持久化，刷新后绑定关系不丢失
+  useEffect(() => {
+    storeDevices(devices)
+  }, [devices])
+
   const api = useMemo<AppApi>(
-    () => ({ view, navigate, devices, addDevice, removeDevice, pets, addPet }),
-    [view, navigate, devices, addDevice, removeDevice, pets, addPet],
+    () => ({
+      view,
+      navigate,
+      devices,
+      addDevice,
+      removeDevice,
+      pets,
+      addPet,
+      account,
+      signIn,
+      signOut,
+    }),
+    [view, navigate, devices, addDevice, removeDevice, pets, addPet, account, signIn, signOut],
   )
 
   return (
     <AppContext.Provider value={api}>
-      <div className="flex h-dvh flex-col bg-[#f7f7f8] text-[#171717]">
+      <div className="relative flex h-dvh flex-col bg-[#f7f7f8] text-[#171717]">
         {renderView(view)}
       </div>
     </AppContext.Provider>

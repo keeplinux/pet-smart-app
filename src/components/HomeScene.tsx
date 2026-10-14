@@ -6,17 +6,25 @@ import type { Device, DeviceKind } from '../nav'
 const PLANET_RADIUS = 2.4
 const UP_VECTOR = new THREE.Vector3(0, 1, 0)
 
+/** 初始默认视角：45° 斜俯视，海平面构图（用户可用拖动/缩放覆盖并自动记忆） */
+const DEFAULT_CAMERA = { x: 0, y: 5.6, z: 5.6 }
+const VIEW_STORAGE_KEY = 'pet-smart-app:home-view'
+const MAX_DISTANCE = 9.6
+const COMPOSE_FACTOR = 0.192
+
 const catColors = ['#e08a4e', '#7f9cf5', '#b47ad4', '#5bb5a0']
 
 const catStart: [number, number][] = [
-  [0.2, 1.25],
+  [4.55, 0.52],
   [2.2, 1.7],
   [3.8, 1.1],
   [4.9, 1.9],
 ]
 
+// 设备落位（球面角 theta/phi）。饮水舱固定在星球轮廓线（海平面）上，
+// 初始 45° 视角下恰好处在画面 30% 高度处的地平线附近；其余设备围绕分布。
 const deviceSpherical: Record<DeviceKind, [number, number]> = {
-  water: [1.0, 1.35],
+  water: [4.3, 0.6],
   feeder: [2.8, 1.6],
   litter: [4.3, 1.4],
   camera: [5.6, 1.55],
@@ -24,8 +32,8 @@ const deviceSpherical: Record<DeviceKind, [number, number]> = {
   generic: [3.5, 1.2],
 }
 
-const drinkTheta = 1.0
-const drinkPhi = 1.35
+const drinkTheta = 4.3
+const drinkPhi = 0.6
 
 type BehaviorMode = 'idle' | 'walk' | 'run' | 'drink' | 'sleep'
 
@@ -93,7 +101,15 @@ export function HomeScene({
       0.1,
       100,
     )
-    camera.position.set(0, 1.2, 7.5)
+    // 45° 斜俯视看向星球中心；若用户此前调整过视角（自动记忆），直接恢复其最优视角
+    const savedView = readSavedView()
+    if (savedView) {
+      camera.position.set(savedView.x, savedView.y, savedView.z)
+    } else {
+      camera.position.set(DEFAULT_CAMERA.x, DEFAULT_CAMERA.y, DEFAULT_CAMERA.z)
+    }
+    // 构图锚定距离：默认视角或恢复视角下的相机到球心距离
+    const composeAnchor = camera.position.length()
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -118,9 +134,21 @@ export function HomeScene({
     controls.target.set(0, 0, 0)
     controls.enableDamping = true
     controls.enablePan = false
-    controls.rotateSpeed = 0.8
+    // 灵敏度收紧：轻滑不会一下转到很远的视角
+    controls.rotateSpeed = 0.45
+    controls.zoomSpeed = 0.6
     controls.minDistance = 4.6
-    controls.maxDistance = 11
+    controls.maxDistance = MAX_DISTANCE
+
+    // 用户调整结束后（等阻尼惯性动画稳定）自动记忆视角，
+    // 之后每次打开 App 都以其最优视角作为默认视角
+    let saveViewTimer = 0
+    controls.addEventListener('end', () => {
+      window.clearTimeout(saveViewTimer)
+      saveViewTimer = window.setTimeout(() => {
+        saveView(camera.position)
+      }, 800)
+    })
 
     const raycaster = new THREE.Raycaster()
     let downX = 0
@@ -157,6 +185,19 @@ export function HomeScene({
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
     renderer.domElement.addEventListener('click', handleClick)
 
+    // 动态构图：默认距离下视口向上取景约 19%（顶部星空约占 30%、海平面构图），
+    // 拉远时 offset 随距离线性衰减，缩到 MAX_DISTANCE（最远）时星球完全居中；
+    // 旋转轴（OrbitControls target）始终锚定星球中心，与取景偏移互不干扰
+    const applyCompose = () => {
+      const width = mount.clientWidth
+      const height = mount.clientHeight
+      if (!width || !height) return
+      const dist = camera.position.distanceTo(controls.target)
+      const span = Math.max(0.001, MAX_DISTANCE - composeAnchor)
+      const ratio = THREE.MathUtils.clamp((MAX_DISTANCE - dist) / span, 0, 1)
+      camera.setViewOffset(width, height, 0, -height * COMPOSE_FACTOR * ratio, width, height)
+    }
+
     const resize = () => {
       const width = mount.clientWidth
       const height = mount.clientHeight
@@ -164,6 +205,7 @@ export function HomeScene({
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
+      applyCompose()
     }
 
     const resizeObserver = new ResizeObserver(resize)
@@ -181,6 +223,7 @@ export function HomeScene({
         state.cats.forEach((cat) => updateCat(cat, dt, time, state.hasWater))
       }
       controls.update()
+      applyCompose()
       renderer.render(scene, camera)
     })
 
@@ -197,6 +240,7 @@ export function HomeScene({
 
     return () => {
       renderer.setAnimationLoop(null)
+      window.clearTimeout(saveViewTimer)
       controls.dispose()
       resizeObserver.disconnect()
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
@@ -227,10 +271,14 @@ export function HomeScene({
     }
 
     const deviceGroups: THREE.Object3D[] = []
+    // 同型号多台设备时按顺序错开角度，避免模型完全重叠
+    const kindCounters = new Map<DeviceKind, number>()
     devices.forEach((device) => {
       const model = createDeviceModel(device.kind)
-      const [theta, phi] = deviceSpherical[device.kind] ?? [3.5, 1.2]
-      placeOnPlanet(model, theta, phi)
+      const [baseTheta, basePhi] = deviceSpherical[device.kind] ?? [3.5, 1.2]
+      const offset = kindCounters.get(device.kind) ?? 0
+      kindCounters.set(device.kind, offset + 1)
+      placeOnPlanet(model, baseTheta + offset * 0.42, basePhi + (offset % 2) * 0.2)
       model.userData.deviceId = device.id
       deviceGroups.push(model)
       state.contentGroup.add(model)
@@ -555,6 +603,37 @@ function createDeviceModel(kind: DeviceKind): THREE.Group {
   }
 
   return group
+}
+
+/** 读取用户上次调整并固化的最优视角（localStorage），无记录或数据损坏时返回 null */
+function readSavedView(): { x: number; y: number; z: number } | null {
+  try {
+    const raw = window.localStorage.getItem(VIEW_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown; z?: unknown }
+    if (
+      typeof parsed.x !== 'number' ||
+      typeof parsed.y !== 'number' ||
+      typeof parsed.z !== 'number'
+    ) {
+      return null
+    }
+    return parsed as { x: number; y: number; z: number }
+  } catch {
+    return null
+  }
+}
+
+/** 固化当前相机位置为下次启动的默认视角；存储不可用时静默忽略 */
+function saveView(position: THREE.Vector3) {
+  try {
+    window.localStorage.setItem(
+      VIEW_STORAGE_KEY,
+      JSON.stringify({ x: position.x, y: position.y, z: position.z }),
+    )
+  } catch {
+    // localStorage 不可用（如隐私模式）时忽略，不影响交互
+  }
 }
 
 function disposeObject(root: THREE.Object3D) {

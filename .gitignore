@@ -13,6 +13,9 @@ dist-ssr
 *.local
 *.apk
 
+# Local AI usage logs (token records, not project source)
+dsh-usage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

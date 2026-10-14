@@ -17,7 +17,7 @@ export const products: Product[] = [
   },
   {
     id: 'smart-water',
-    name: '智能饮水机',
+    name: '饮水舱',
     category: '饮水',
     description: '流动活水、滤芯提醒',
     image: '/products/smart-water.svg',

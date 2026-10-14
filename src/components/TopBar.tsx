@@ -2,7 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 
 export function TopBar({ title, onBack }: { title: string; onBack: () => void }) {
   return (
-    <header className="flex shrink-0 items-center gap-2 border-b border-[#171717]/10 bg-white px-4 py-3">
+    <header className="flex shrink-0 items-center gap-2 border-b border-[#171717]/10 bg-white px-4 pb-3 safe-top">
       <button
         type="button"
         onClick={onBack}

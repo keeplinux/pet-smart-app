@@ -10,13 +10,12 @@ export type SmartWaterDeviceData = {
   waterTemperatureText: string
   waterQualityPercent: number
   waterQualityText: string
-  probeStatus: string
-  flowMode: string
-  lightMode: string
+  flowEnabled: boolean
+  lightEnabled: boolean
 }
 
 export const smartWaterDeviceData: SmartWaterDeviceData = {
-  name: '宠物暖泉',
+  name: '饮水舱',
   online: true,
   location: '客厅',
   todayWaterMl: 850,
@@ -27,7 +26,6 @@ export const smartWaterDeviceData: SmartWaterDeviceData = {
   waterTemperatureText: '适宜',
   waterQualityPercent: 96,
   waterQualityText: '健康',
-  probeStatus: '探针运行中',
-  flowMode: '感应流动',
-  lightMode: '柔和灯光',
+  flowEnabled: true,
+  lightEnabled: true,
 }

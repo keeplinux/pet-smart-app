@@ -26,7 +26,7 @@ export function PurchaseView({ productId }: { productId: string }) {
   return (
     <>
       <TopBar title={product.name} onBack={() => navigate({ name: 'mall' })} />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 safe-bottom">
         <section className="rounded-lg border border-[#171717]/10 bg-white p-4">
           <p className="m-0 text-sm font-semibold">{product.name}</p>
           <p className="m-0 mt-1 text-xs text-[#171717]/45">{product.description}</p>

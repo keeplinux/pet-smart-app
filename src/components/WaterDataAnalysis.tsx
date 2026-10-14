@@ -25,10 +25,9 @@ export function WaterDataAnalysis() {
   }
 
   return (
-    <section className="rounded-lg border border-[#171717]/10 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="m-0 text-sm font-semibold">数据分析</h2>
-        <div className="grid grid-cols-3 rounded-lg border border-[#171717]/10 p-0.5 text-xs">
+    <section className="py-1">
+      <div className="mb-3 flex items-center justify-end">
+        <div className="grid grid-cols-3 rounded-lg bg-[#171717]/5 p-0.5 text-xs">
           {periods.map((item) => (
             <button
               key={item}
@@ -54,13 +53,13 @@ export function WaterDataAnalysis() {
               key={pet.petId}
               type="button"
               onClick={() => togglePet(pet.petId)}
-              className={`flex items-center gap-2 rounded-lg border border-[#171717]/10 px-3 py-2 text-xs transition ${
+              className={`flex items-center gap-2 rounded-lg bg-[#171717]/4 px-3 py-2 text-xs transition ${
                 hidden ? 'opacity-40' : ''
               }`}
             >
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: pet.color }} />
               <span className="font-medium">{pet.name}</span>
-              <span className="text-[#171717]/50">{totalFor(pet, period)} ml</span>
+              <span className="text-[#171717]/50">{formatLiters(totalFor(pet, period))} L</span>
             </button>
           )
         })}
@@ -87,9 +86,17 @@ function WaterChart({
   const innerHeight = height - padTop - padBottom
   const pointCount = waterStatPets[0].series[period].length
   const ticks = periodTicks[period]
+  const slotW = innerWidth / pointCount
+  const barGap = 1.5
+  const barW = Math.max(
+    2,
+    Math.min(7, (slotW * 0.72 - barGap * Math.max(0, pets.length - 1)) / Math.max(1, pets.length)),
+  )
+  const groupW = barW * pets.length + barGap * Math.max(0, pets.length - 1)
+  const baseline = padTop + innerHeight
 
-  function pointX(index: number) {
-    return padX + (index / (pointCount - 1)) * innerWidth
+  function slotCenter(index: number) {
+    return padX + index * slotW + slotW / 2
   }
 
   function pointY(value: number) {
@@ -101,7 +108,7 @@ function WaterChart({
       viewBox={`0 0 ${width} ${height}`}
       className="h-auto w-full"
       role="img"
-      aria-label={`${periodTabLabels[period]}期饮水曲线`}
+      aria-label={`${periodTabLabels[period]}期饮水量条形图`}
     >
       {[0.25, 0.5, 0.75].map((fraction) => (
         <line
@@ -115,10 +122,19 @@ function WaterChart({
         />
       ))}
 
+      <line
+        x1={padX}
+        x2={width - padX}
+        y1={baseline}
+        y2={baseline}
+        stroke="#171717"
+        strokeOpacity={0.12}
+      />
+
       {ticks.indexes.map((index, i) => (
         <text
           key={index}
-          x={pointX(index)}
+          x={slotCenter(index)}
           y={height - 6}
           textAnchor="middle"
           fontSize="9"
@@ -129,25 +145,26 @@ function WaterChart({
         </text>
       ))}
 
-      {pets.map((pet) => (
+      {pets.map((pet, petIndex) => (
         <g key={pet.petId}>
-          <polyline
-            points={pet.series[period].map((value, i) => `${pointX(i)},${pointY(value)}`).join(' ')}
-            fill="none"
-            stroke={pet.color}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {pet.series[period].map((value, i) => (
-            <circle
-              key={i}
-              cx={pointX(i)}
-              cy={pointY(value)}
-              r="2"
-              fill={pet.color}
-            />
-          ))}
+          {pet.series[period].map((value, i) => {
+            if (value <= 0) {
+              return null
+            }
+            const barH = Math.max((value / yMax) * innerHeight, 1.5)
+            const x = padX + i * slotW + (slotW - groupW) / 2 + petIndex * (barW + barGap)
+            return (
+              <rect
+                key={i}
+                x={x}
+                y={baseline - barH}
+                width={barW}
+                height={barH}
+                rx={Math.min(1.5, barW / 2)}
+                fill={pet.color}
+              />
+            )
+          })}
         </g>
       ))}
     </svg>
@@ -156,4 +173,10 @@ function WaterChart({
 
 function totalFor(pet: PetWaterSeries, period: WaterStatPeriod) {
   return pet.series[period].reduce((sum, value) => sum + value, 0)
+}
+
+/** 毫升转升展示：大数值保留 1 位小数，小数值保留 2 位 */
+function formatLiters(ml: number) {
+  const liters = ml / 1000
+  return liters >= 10 ? liters.toFixed(1) : liters.toFixed(2)
 }

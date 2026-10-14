@@ -9,7 +9,7 @@ export function Mall() {
   return (
     <>
       <TopBar title="商城" onBack={() => navigate({ name: 'home' })} />
-      <main className="flex flex-1 flex-col overflow-y-auto p-4">
+      <main className="flex flex-1 flex-col overflow-y-auto p-4 safe-bottom">
         <p className="m-0 mb-3 text-xs text-[#171717]/45">选择要购买的宠物用品</p>
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {products.map((product) => (

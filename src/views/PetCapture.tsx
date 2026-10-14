@@ -30,7 +30,7 @@ export function PetCapture() {
   return (
     <>
       <TopBar title="录入宠物数字形象" onBack={() => navigate({ name: 'home' })} />
-      <main className="flex flex-1 flex-col items-center gap-4 overflow-y-auto p-4">
+      <main className="flex flex-1 flex-col items-center gap-4 overflow-y-auto p-4 safe-bottom">
         <div className="flex aspect-square w-full max-w-sm items-center justify-center overflow-hidden rounded-lg border border-dashed border-[#171717]/20 bg-white">
           {preview ? (
             <img src={preview} alt="宠物预览" className="h-full w-full object-cover" />

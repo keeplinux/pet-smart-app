@@ -1,29 +1,124 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Camera, Pause, Play, Video } from 'lucide-react'
+import { Camera, ChevronLeft, Pause, Play, Video, Wifi } from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
 import { WaterDataAnalysis } from '../components/WaterDataAnalysis'
 import { smartWaterDeviceData as data } from '../deviceData'
+import { payloadFromDevice } from '../provisioning'
 
-type CameraClip = {
-  id: string
-  title: string
-  time: string
+/** 一段录像：start 为当天起始分钟，duration 单位分钟 */
+type RecordClip = {
+  start: number
   duration: number
+  title: string
+  petName: string
+  waterMl: number
+  photo: string
 }
 
-const cameraClips: CameraClip[] = [
-  { id: 'c1', title: '早餐饮水', time: '今天 08:12', duration: 24 },
-  { id: 'c2', title: '清晨饮水', time: '今天 06:47', duration: 18 },
-  { id: 'c3', title: '晚间饮水', time: '昨天 21:05', duration: 31 },
-  { id: 'c4', title: '午后饮水', time: '昨天 15:30', duration: 22 },
-]
+/** 一个录像日：dateKey 为 YYYY-MM-DD */
+type RecordDay = {
+  dateKey: string
+  label: string
+  clips: RecordClip[]
+}
+
+function dateKeyOf(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`
+}
+
+/** 演示录像数据：近三天，宇宙叙事风格的片段命名；真实单次饮水时长不超过 3 分钟 */
+function buildRecordDays(): RecordDay[] {
+  const now = new Date()
+  const back = (days: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - days)
+  return [
+    {
+      dateKey: dateKeyOf(back(0)),
+      label: '今天',
+      clips: [
+        {
+          start: 6 * 60 + 47,
+          duration: 2,
+          title: '清晨巡航饮水',
+          petName: '糯米',
+          waterMl: 85,
+          photo: '/clips/clip-nuomi-day.jpg',
+        },
+        {
+          start: 8 * 60 + 12,
+          duration: 3,
+          title: '早餐补给饮水',
+          petName: '团子',
+          waterMl: 120,
+          photo: '/clips/clip-tuanzi.jpg',
+        },
+        {
+          start: 21 * 60 + 5,
+          duration: 2,
+          title: '夜间巡航饮水',
+          petName: '糯米',
+          waterMl: 60,
+          photo: '/clips/clip-nuomi-night.jpg',
+        },
+      ],
+    },
+    {
+      dateKey: dateKeyOf(back(1)),
+      label: '昨天',
+      clips: [
+        {
+          start: 9 * 60 + 30,
+          duration: 2,
+          title: '上午远征饮水',
+          petName: '糯米',
+          waterMl: 95,
+          photo: '/clips/clip-nuomi-day.jpg',
+        },
+        {
+          start: 15 * 60 + 30,
+          duration: 3,
+          title: '午后探索饮水',
+          petName: '团子',
+          waterMl: 110,
+          photo: '/clips/clip-tuanzi.jpg',
+        },
+      ],
+    },
+    {
+      dateKey: dateKeyOf(back(2)),
+      label: '前天',
+      clips: [
+        {
+          start: 7 * 60 + 15,
+          duration: 1,
+          title: '晨间巡游饮水',
+          petName: '团子',
+          waterMl: 75,
+          photo: '/clips/clip-tuanzi.jpg',
+        },
+        {
+          start: 20 * 60 + 40,
+          duration: 2,
+          title: '傍晚星航饮水',
+          petName: '糯米',
+          waterMl: 100,
+          photo: '/clips/clip-nuomi-night.jpg',
+        },
+      ],
+    },
+  ]
+}
+
+const recordDays = buildRecordDays()
 
 export function DeviceView({ deviceId }: { deviceId: string }) {
   const { navigate, devices } = useApp()
   const device = devices.find((item) => item.id === deviceId)
-  const [flowMode, setFlowMode] = useState(data.flowMode)
+  const [flowOn, setFlowOn] = useState(data.flowEnabled)
+  const [lightOn, setLightOn] = useState(data.lightEnabled)
 
   if (!device) {
     return (
@@ -39,43 +134,64 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
   return (
     <>
       <TopBar title={device.name} onBack={() => navigate({ name: 'home' })} />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-        <div
-          className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium ${
-            device.online ? 'bg-[#171717] text-white' : 'bg-[#171717]/10'
-          }`}
-        >
-          <span className={`h-2 w-2 rounded-full ${device.online ? 'bg-emerald-400' : 'bg-[#171717]/30'}`} />
-          {device.online
-            ? device.kind === 'water'
-              ? `在线 · ${data.probeStatus}`
-              : '在线'
-            : '离线'}
-        </div>
+      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 safe-bottom">
+        {device.status === 'pending' ? (
+          <div className="flex flex-col gap-2.5 rounded-lg bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <Wifi size={16} className="mt-0.5 shrink-0 text-amber-600" />
+              <div className="min-w-0">
+                <p className="m-0 text-sm font-medium text-amber-800">该设备尚未配网</p>
+                <p className="m-0 mt-0.5 text-xs leading-5 text-amber-700">
+                  通过保底热点自动发现（{device.sn}），完成 WiFi 配网后即可正常使用。
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                navigate({
+                  name: 'provision',
+                  payload: payloadFromDevice(device),
+                  source: 'hotspot',
+                })
+              }
+              className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-[#171717] text-sm font-medium text-white hover:bg-[#171717]/85"
+            >
+              <Wifi size={15} /> 立即配网
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-1 text-sm font-medium">
+            <span
+              className={`h-2 w-2 rounded-full ${device.online ? 'bg-emerald-400' : 'bg-[#171717]/30'}`}
+            />
+            <span className={`ml-2 ${device.online ? '' : 'text-[#171717]/45'}`}>
+              {device.online ? '在线' : '离线'}
+            </span>
+          </div>
+        )}
 
         {device.kind === 'water' ? (
           <>
             <WaterDataAnalysis />
 
-            <div className="grid grid-cols-4 gap-2">
-              <Metric label="今日饮水量" value={`${data.todayWaterMl}`} sub="ml" />
-              <Metric label="水量" value={`${data.waterLevelPercent}%`} sub={data.waterLevelText} />
+            <div className="flex items-center justify-center gap-12">
+              <Metric label="剩余水量" value={`${data.waterLevelPercent}%`} sub={data.waterLevelText} />
               <Metric
                 label="水温"
                 value={`${data.waterTemperatureC}°C`}
                 sub={data.waterTemperatureText}
               />
               <Metric
-                label="水质健康度"
+                label="水质"
                 value={`${data.waterQualityPercent}%`}
                 sub={data.waterQualityText}
               />
             </div>
 
-            <section className="rounded-lg border border-[#171717]/10 bg-white p-2">
-              <InfoRow label="探针运行状态" value={data.probeStatus} />
-              <FlowModeRow value={flowMode} onChange={setFlowMode} />
-              <InfoRow label="灯光" value={data.lightMode} />
+            <section className="py-1">
+              <ToggleRow label="流动水" value={flowOn} onChange={setFlowOn} />
+              <ToggleRow label="氛围灯" value={lightOn} onChange={setLightOn} />
             </section>
 
             <CameraSection />
@@ -95,63 +211,50 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
 
 function CameraSection() {
   const [tab, setTab] = useState<'live' | 'history'>('live')
-  const [selectedClip, setSelectedClip] = useState<CameraClip | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    if (!playing || !selectedClip) return
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + 1
-        if (next >= selectedClip.duration) {
-          setPlaying(false)
-          return selectedClip.duration
-        }
-        return next
-      })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [playing, selectedClip])
-
-  function togglePlayback() {
-    if (!selectedClip) return
-    if (progress >= selectedClip.duration) {
-      setProgress(0)
-      setPlaying(true)
-      return
-    }
-    setPlaying((value) => !value)
-  }
+  const [selectedDay, setSelectedDay] = useState<RecordDay | null>(null)
+  const [pendingStart, setPendingStart] = useState<number | null>(null)
+  const today = recordDays[0]
 
   return (
-    <section className="rounded-lg border border-[#171717]/10 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="m-0 text-sm font-semibold">摄像头</h2>
-        <div className="grid grid-cols-2 rounded-lg border border-[#171717]/10 p-0.5 text-xs">
+    <section className="py-1">
+      <div className="mb-3 flex items-center justify-end">
+        <div className="grid grid-cols-2 rounded-lg bg-[#171717]/5 p-0.5 text-xs">
           <TabButton active={tab === 'live'} onClick={() => setTab('live')}>
             实时
           </TabButton>
-          <TabButton active={tab === 'history'} onClick={() => setTab('history')}>
-            回放
+          <TabButton
+            active={tab === 'history'}
+            onClick={() => {
+              setTab('history')
+              setSelectedDay(null)
+            }}
+          >
+            历史
           </TabButton>
         </div>
       </div>
 
       {tab === 'live' ? (
-        <LiveView />
+        <div className="flex flex-col gap-3">
+          <LiveView />
+          <ClipList
+            clips={today.clips}
+            onSelect={(clip) => {
+              setPendingStart(clip.start)
+              setSelectedDay(today)
+              setTab('history')
+            }}
+          />
+        </div>
+      ) : selectedDay ? (
+        <HistoryPlayer day={selectedDay} initialStart={pendingStart} onBack={() => setSelectedDay(null)} />
       ) : (
-        <HistoryView
-          clips={cameraClips}
-          selectedClip={selectedClip}
-          playing={playing}
-          progress={progress}
-          onSelect={(clip) => {
-            setSelectedClip(clip)
-            setProgress(0)
-            setPlaying(false)
+        <CalendarView
+          days={recordDays}
+          onSelect={(day) => {
+            setPendingStart(null)
+            setSelectedDay(day)
           }}
-          onTogglePlay={togglePlayback}
         />
       )}
     </section>
@@ -191,135 +294,341 @@ function LiveView() {
   )
 }
 
-function HistoryView({
-  clips,
-  selectedClip,
-  playing,
-  progress,
+/** 日历选择器：有录像的日期可选，选中后进入当天回放 */
+function CalendarView({
+  days,
   onSelect,
-  onTogglePlay,
 }: {
-  clips: CameraClip[]
-  selectedClip: CameraClip | null
-  playing: boolean
-  progress: number
-  onSelect: (clip: CameraClip) => void
-  onTogglePlay: () => void
+  days: RecordDay[]
+  onSelect: (day: RecordDay) => void
+}) {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7 // 周一为 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const byKey = new Map(days.map((day) => [day.dateKey, day]))
+  const todayKey = dateKeyOf(now)
+  const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+
+  const cells: (number | null)[] = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+
+  return (
+    <div className="flex flex-col items-center gap-3 py-2">
+      <p className="m-0 text-sm font-semibold">
+        {year}年{month + 1}月
+      </p>
+      <div className="grid w-full max-w-72 grid-cols-7">
+        {weekLabels.map((label) => (
+          <span
+            key={label}
+            className="grid h-8 place-items-center text-[10px] text-[#171717]/40"
+          >
+            {label}
+          </span>
+        ))}
+        {cells.map((day, index) => {
+          if (day === null) {
+            return <span key={`empty-${index}`} />
+          }
+          const key = dateKeyOf(new Date(year, month, day))
+          const record = byKey.get(key)
+          const isToday = key === todayKey
+          return (
+            <button
+              key={key}
+              type="button"
+              disabled={!record}
+              onClick={() => record && onSelect(record)}
+              className={`relative grid h-10 place-items-center rounded-full text-sm ${
+                record
+                  ? 'font-medium hover:bg-[#171717]/8'
+                  : 'text-[#171717]/25'
+              } ${isToday ? 'outline outline-1 outline-offset-2 outline-[#171717]/40' : ''}`}
+            >
+              {day}
+              {record && (
+                <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-[#171717]/55" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <p className="m-0 text-[10px] text-[#171717]/40">带圆点的日期有录像记录</p>
+    </div>
+  )
+}
+
+/** 分钟数转 H:MM（小时不补零，如 6:47） */
+function fmtMinute(minute: number) {
+  const clamped = Math.max(0, Math.min(1439, Math.round(minute)))
+  return `${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, '0')}`
+}
+
+/** 饮水片段截取列表：宠物名 + 饮用量 + 时间，右侧实拍照片贴合行边框 */
+function ClipList({
+  clips,
+  activeStart,
+  onSelect,
+}: {
+  clips: RecordClip[]
+  activeStart?: number | null
+  onSelect: (clip: RecordClip) => void
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-[#171717]">
-        {selectedClip ? (
-          <>
-            <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#171717]">
-              {selectedClip.title}
-            </span>
-            <button
-              type="button"
-              onClick={onTogglePlay}
-              aria-label={playing ? '暂停' : '播放'}
-              className="grid h-12 w-12 place-items-center rounded-full bg-white text-[#171717]"
-            >
-              {playing ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
-            </button>
-            <div className="absolute inset-x-3 bottom-3">
-              <div className="h-1 overflow-hidden rounded-full bg-white/25">
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{ width: `${selectedClip.duration ? (progress / selectedClip.duration) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="mt-1 flex justify-between text-[10px] text-white/80">
-                <span>{formatTime(progress)}</span>
-                <span>{formatTime(selectedClip.duration)}</span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <Video size={32} className="text-white/50" />
-        )}
-      </div>
-
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {clips.map((clip) => (
-          <li key={clip.id}>
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      {clips.map((clip) => {
+        const active = activeStart != null && activeStart === clip.start
+        return (
+          <li key={`${clip.start}-${clip.title}`}>
             <button
               type="button"
               onClick={() => onSelect(clip)}
-              className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left ${
-                selectedClip?.id === clip.id
-                  ? 'border-[#171717] bg-[#171717]/3'
-                  : 'border-[#171717]/10 bg-white'
+              className={`relative flex w-full items-center gap-3 overflow-hidden rounded-lg py-3 pl-3 pr-[6.5rem] text-left ${
+                active ? 'bg-[#171717]/10' : 'bg-[#171717]/4'
               }`}
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#171717]/5">
                 <Play size={15} fill="currentColor" className="ml-0.5" />
               </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-medium">{clip.title}</span>
-                <span className="block text-xs text-[#171717]/45">
-                  {clip.time} · {clip.duration} 秒
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">
+                  {clip.petName} · {clip.title}
+                </span>
+                <span className="mt-0.5 flex items-center gap-3 text-xs text-[#171717]/45">
+                  <span>{fmtMinute(clip.start)}</span>
+                  <span>{clip.waterMl}ml</span>
+                  <span>{clip.duration}分钟</span>
                 </span>
               </span>
+              <img
+                src={clip.photo}
+                alt={`${clip.petName}饮水照片`}
+                className="absolute right-0 top-0 h-full w-24 object-cover"
+              />
             </button>
           </li>
-        ))}
-      </ul>
-    </div>
+        )
+      })}
+    </ul>
   )
 }
 
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
-  const rest = Math.floor(seconds % 60).toString().padStart(2, '0')
-  return `${minutes}:${rest}`
+const PX_PER_MIN = 4
+const DAY_MINUTES = 24 * 60
+
+/** 历史回放：画面内嵌 24 小时时间轴，拖动滚动条自由拉取时间段 */
+function HistoryPlayer({
+  day,
+  initialStart,
+  onBack,
+}: {
+  day: RecordDay
+  initialStart: number | null
+  onBack: () => void
+}) {
+  const [minute, setMinute] = useState(() => initialStart ?? day.clips[0]?.start ?? 0)
+  const [playing, setPlaying] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const activeClip =
+    day.clips.find((clip) => minute >= clip.start && minute < clip.start + clip.duration) ?? null
+
+  // 挂载 / 换日期 / 指定起始片段时定位时间轴
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) {
+      el.scrollLeft = (initialStart ?? day.clips[0]?.start ?? 0) * PX_PER_MIN
+    }
+  }, [day, initialStart])
+
+  // 播放推进：每 200ms 前进 0.1 分钟（演示倍速，单次饮水 1-3 分钟），离开片段自动停止
+  useEffect(() => {
+    if (!playing) return
+    const timer = setInterval(() => {
+      const el = scrollRef.current
+      if (!el) {
+        setPlaying(false)
+        return
+      }
+      const next = el.scrollLeft + 0.1 * PX_PER_MIN
+      el.scrollLeft = next
+      const m = next / PX_PER_MIN
+      const inClip = day.clips.some((clip) => m >= clip.start && m < clip.start + clip.duration)
+      if (!inClip || m >= DAY_MINUTES - 1) {
+        setPlaying(false)
+      }
+    }, 200)
+    return () => clearInterval(timer)
+  }, [playing, day])
+
+  function handleScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    setMinute(el.scrollLeft / PX_PER_MIN)
+  }
+
+  const clipProgress =
+    activeClip && activeClip.duration > 0
+      ? Math.min(1, Math.max(0, (minute - activeClip.start) / activeClip.duration))
+      : 0
+
+  function jumpToClip(clip: RecordClip) {
+    setPlaying(false)
+    const el = scrollRef.current
+    if (el) {
+      el.scrollLeft = clip.start * PX_PER_MIN
+      setMinute(clip.start)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-[#171717]">
+      <span className="absolute left-3 top-3 flex items-center gap-2">
+        <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#171717]">
+          {day.label} {fmtMinute(minute)}
+        </span>
+        {activeClip && (
+          <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#171717]">
+            {activeClip.title}
+          </span>
+        )}
+      </span>
+
+      <button
+        type="button"
+        onClick={onBack}
+        className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/12 px-2.5 py-1 text-[10px] font-medium text-white/85 hover:bg-white/20"
+      >
+        <ChevronLeft size={12} /> 换日期
+      </button>
+
+      {activeClip ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setPlaying((value) => !value)}
+            aria-label={playing ? '暂停' : '播放'}
+            className="grid h-12 w-12 place-items-center rounded-full bg-white text-[#171717]"
+          >
+            {playing ? (
+              <Pause size={20} fill="currentColor" />
+            ) : (
+              <Play size={20} fill="currentColor" className="ml-0.5" />
+            )}
+          </button>
+
+          <div className="absolute inset-x-3 bottom-14">
+            <div className="h-1 overflow-hidden rounded-full bg-white/25">
+              <div
+                className="h-full rounded-full bg-white"
+                style={{ width: `${clipProgress * 100}%` }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-white/80">
+              <span>{fmtMinute(activeClip.start)}</span>
+              <span>{fmtMinute(activeClip.start + activeClip.duration)}</span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center gap-1.5 text-white/50">
+          <Video size={30} />
+          <span className="text-xs">该时间段无录像</span>
+        </div>
+      )}
+
+      {/* 画面内嵌 24 小时时间轴：拖动滚动条拉取时间段，中心线为当前时间 */}
+      <div className="absolute inset-x-0 bottom-0">
+        <div className="relative bg-black/45">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="timeline-scroll h-10 overflow-x-auto"
+          >
+            <div className="relative h-10" style={{ width: DAY_MINUTES * PX_PER_MIN, margin: '0 50%' }}>
+              {day.clips.map((clip) => (
+                <span
+                  key={clip.start}
+                  className="absolute top-1.5 h-1.5 rounded-full bg-amber-400/90"
+                  style={{
+                    left: clip.start * PX_PER_MIN,
+                    width: Math.max(6, clip.duration * PX_PER_MIN),
+                  }}
+                />
+              ))}
+              {Array.from({ length: 96 }, (_, i) =>
+                i % 4 === 0 ? null : (
+                  <span
+                    key={`tick-${i}`}
+                    className="absolute bottom-3.5 h-1 w-px bg-white/20"
+                    style={{ left: i * 15 * PX_PER_MIN }}
+                  />
+                ),
+              )}
+              {Array.from({ length: 24 }, (_, h) => (
+                <span key={`hour-${h}`} className="absolute bottom-0 h-10" style={{ left: h * 60 * PX_PER_MIN }}>
+                  <span className="absolute bottom-3.5 h-2 w-px bg-white/40" />
+                  <span className="absolute bottom-0.5 left-0 -translate-x-1/2 text-[8px] text-white/55">
+                    {String(h).padStart(2, '0')}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+          <span className="pointer-events-none absolute left-1/2 top-0 h-10 w-0.5 -translate-x-1/2 rounded-full bg-white" />
+          </div>
+        </div>
+      </div>
+
+      {/* 当天饮水片段截取列表：点击定位到时间轴对应位置 */}
+      <ClipList clips={day.clips} activeStart={activeClip?.start ?? null} onSelect={jumpToClip} />
+    </div>
+  )
 }
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-[#171717]/10 bg-white p-2.5">
-      <p className="m-0 text-[10px] text-[#171717]/45">{label}</p>
-      <p className="m-0 mt-1 text-sm font-semibold leading-none">{value}</p>
-      {sub && <p className="m-0 mt-1 text-[10px] text-[#171717]/50">{sub}</p>}
+    <div className="min-w-0 text-center">
+      <p className="m-0 whitespace-nowrap text-[10px] text-[#171717]/45">{label}</p>
+      <p className="m-0 mt-1 whitespace-nowrap text-sm font-semibold leading-none">{value}</p>
+      {sub && <p className="m-0 mt-1 whitespace-nowrap text-[10px] text-[#171717]/50">{sub}</p>}
     </div>
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg px-3 py-3">
-      <span className="text-sm text-[#171717]/60">{label}</span>
-      <span className="text-sm font-medium">{value}</span>
-    </div>
-  )
-}
-
-const flowModes = ['持续流动', '感应流动', '不流动']
-
-function FlowModeRow({
+function ToggleRow({
+  label,
   value,
   onChange,
 }: {
-  value: string
-  onChange: (value: string) => void
+  label: string
+  value: boolean
+  onChange: (value: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-3">
-      <span className="shrink-0 text-sm text-[#171717]/60">出水方式</span>
-      <div className="grid grid-cols-3 rounded-lg border border-[#171717]/10 p-0.5 text-xs">
-        {flowModes.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onChange(mode)}
-            className={`rounded-md px-2 py-1 font-medium ${
-              value === mode ? 'bg-[#171717] text-white' : 'text-[#171717]/50'
-            }`}
-          >
-            {mode}
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center justify-between rounded-lg px-3 py-3">
+      <span className="text-sm text-[#171717]/60">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
+        onClick={() => onChange(!value)}
+        className={`relative h-6 w-11 rounded-full transition-colors ${
+          value ? 'bg-[#171717]' : 'bg-[#171717]/15'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-[left] ${
+            value ? 'left-[22px]' : 'left-0.5'
+          }`}
+        />
+      </button>
     </div>
   )
 }
