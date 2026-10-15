@@ -69,7 +69,10 @@ function App() {
     setDevices((prev) => {
       const index = prev.findIndex((device) => device.sn === input.sn)
       if (index === -1) {
-        return [...prev, buildDevice(input)]
+        const next = [...prev]
+        // 新设备自动插到饮水舱（预置主设备，恒为首位）正下方
+        next.splice(Math.min(1, next.length), 0, buildDevice(input))
+        return next
       }
       const current = prev[index]
       // 已配网设备不会被保底探测降级为待配网

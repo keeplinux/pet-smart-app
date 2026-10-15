@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { Bell, ChevronRight, Info, LogOut, Trash2, Wifi } from 'lucide-react'
+import { Bell, ChevronRight, Info, LogOut, Radar, Trash2, TriangleAlert, Wifi } from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
 import { payloadFromDevice, statusLabel } from '../provisioning'
 import { getAvatarPreset } from '../avatars'
+import type { Device } from '../nav'
 
 export function SettingsView() {
   const { navigate, devices, removeDevice, pets, account, signOut } = useApp()
   const [notifications, setNotifications] = useState(true)
+  const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null)
 
   return (
     <>
@@ -75,7 +77,9 @@ export function SettingsView() {
         </section>
 
         <section className="rounded-lg p-2">
-          <p className="px-3 pt-2 text-xs text-[#171717]/45">设备管理</p>
+          <p className="m-0 flex items-center gap-3 px-3 pt-2 pb-1 text-sm font-medium">
+            <Radar size={18} className="shrink-0" /> 探针状态
+          </p>
           {devices.length === 0 ? (
             <p className="px-3 pb-3 text-sm text-[#171717]/45">暂无设备</p>
           ) : (
@@ -101,8 +105,8 @@ export function SettingsView() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => removeDevice(device.id)}
-                      aria-label={`移除 ${device.name}`}
+                      onClick={() => setDeviceToRemove(device)}
+                      aria-label={`解绑 ${device.name}`}
                       className="grid h-8 w-8 place-items-center rounded-full text-[#171717]/50 hover:bg-[#171717]/8 hover:text-[#171717]"
                     >
                       <Trash2 size={17} />
@@ -129,16 +133,18 @@ export function SettingsView() {
           )}
         </section>
 
-        <section className="rounded-lg p-4">
-          <p className="m-0 flex items-center gap-2 text-sm font-medium">
-            <Info size={18} /> 关于
+        <section className="rounded-lg p-2">
+          <p className="m-0 flex items-center gap-3 px-3 py-3 text-sm font-medium">
+            <Info size={18} className="shrink-0" /> 关于
           </p>
-          <p className="m-0 mt-2 text-xs leading-5 text-[#171717]/50">
-            品牌：硅宠场域 silifield
-          </p>
-          <p className="m-0 text-xs leading-5 text-[#171717]/50">
-            公司：上海硅宠场域科技有限公司
-          </p>
+          <div className="px-3 pb-3">
+            <p className="m-0 text-xs leading-5 text-[#171717]/50">
+              品牌：硅宠场域 silifield
+            </p>
+            <p className="m-0 text-xs leading-5 text-[#171717]/50">
+              公司：上海硅宠场域科技有限公司
+            </p>
+          </div>
         </section>
 
         <button
@@ -149,6 +155,50 @@ export function SettingsView() {
           <LogOut size={17} /> 退出登录
         </button>
       </main>
+
+      {deviceToRemove && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <button
+            type="button"
+            aria-label="关闭"
+            onClick={() => setDeviceToRemove(null)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <section className="relative safe-bottom-lg rounded-t-2xl bg-white px-5 pt-4">
+            <span className="mx-auto block h-1 w-10 rounded-full bg-[#171717]/15" />
+            <div className="mt-4 flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#b3261e]/10 text-[#b3261e]">
+                <TriangleAlert size={19} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="m-0 text-base font-semibold">解绑「{deviceToRemove.name}」</h2>
+                <p className="m-0 mt-1 text-xs leading-5 text-[#171717]/55">
+                  解绑后设备将从账号中移除，本地数据（配网信息、饮水记录）将被清空，
+                  且操作不可恢复。
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                removeDevice(deviceToRemove.id)
+                setDeviceToRemove(null)
+              }}
+              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#b3261e] text-sm font-medium text-white hover:bg-[#b3261e]/85"
+            >
+              <Trash2 size={16} /> 确认解绑
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeviceToRemove(null)}
+              className="mt-2 h-10 w-full rounded-lg text-sm font-medium text-[#171717]/55 hover:bg-[#171717]/5"
+            >
+              取消
+            </button>
+          </section>
+        </div>
+      )}
     </>
   )
 }
