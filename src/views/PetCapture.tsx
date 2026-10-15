@@ -604,11 +604,13 @@ function CaptureStage({
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 20)
-    camera.position.set(0, 1.1, 2.4)
+    camera.position.set(0, 1.1, 2.6)
     camera.lookAt(0, 0.45, 0)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.domElement.style.width = '100%'
+    renderer.domElement.style.height = '100%'
     renderer.domElement.style.touchAction = 'none'
     renderer.domElement.style.cursor = 'pointer'
     mount.appendChild(renderer.domElement)
