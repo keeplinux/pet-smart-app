@@ -18,6 +18,7 @@ dsh-usage/
 
 # Android signing secrets and build outputs
 android/keystore.properties
+android/SIGNING.local.md
 *.keystore
 !debug.keystore
 android/.gradle/

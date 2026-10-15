@@ -7,6 +7,15 @@
 （如录像片段命名「清晨巡航饮水」「夜间巡航饮水」）。
 **领域事实：真实猫咪单次饮水时长不超过 3 分钟**——演示数据、播放速度、片段时长字段都必须遵守。
 
+## Android 签名与打包
+- **正式签名密钥**（本地，不进 git）：`android/silifield-release.keystore`，密码 `silifield-petwater-2026`，
+  别名 `silifield`；完整调用说明见 `android/SIGNING.local.md`（同样不入库）。**keystore 丢失无法补发，需备份**。
+- 打包链：`npm run build` → `npx cap sync android` → `cd android && JAVA_HOME=<jdk21> ./gradlew assembleRelease`。
+  JDK 21 在 `catwater/android-build-tools/jdk21/jdk-21.0.11+10`，SDK 在 `catwater/android-sdk`。
+- 版本号两处同步改：`package.json` 与 `android/app/build.gradle`（versionCode 递增）；APK 复制到根目录命名 `silifield-v<版本>.apk`。
+- 商标 logo 素材：`素材/硅宠场域商标logo.png`（1024 白底，图形深墨绿 #153C2A 区域）；App 图标由
+  `AppData/Local/Temp/logo-work/gen_icons.py` 脚本生成（mipmap 全密度 + splash 全方向 + `public/brand/logo.png`）。
+
 ## 首页 3D 星球（HomeScene.tsx 关键机制）
 - **构图用 `camera.setViewOffset` 动态偏移，不移动相机/target**：OrbitControls `target` 恒为球心，
   旋转/缩放/拾取锚点稳定。`applyCompose()` 每帧调用：`factor = 0.192 × clamp((9.6 - dist)/(9.6 - anchor), 0, 1)`，
