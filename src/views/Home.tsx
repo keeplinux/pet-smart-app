@@ -32,9 +32,9 @@ export function Home() {
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-24 bg-linear-to-b from-black/40 to-transparent" />
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 pb-3 safe-top">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 text-white">
           <LogoMark size="sm" />
-          <span className="text-sm font-semibold text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">
+          <span className="text-sm font-semibold [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">
             硅宠场域
           </span>
         </div>
