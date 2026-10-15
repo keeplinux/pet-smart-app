@@ -1,15 +1,71 @@
-import { useState } from 'react'
-import { Bell, ChevronRight, Info, LogOut, Radar, Trash2, TriangleAlert, Wifi } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Bell,
+  ChevronRight,
+  CircleCheck,
+  Download,
+  Info,
+  LoaderCircle,
+  LogOut,
+  Radar,
+  Trash2,
+  TriangleAlert,
+  Wifi,
+} from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { payloadFromDevice, statusLabel } from '../provisioning'
+import {
+  APP_UPDATE_NOTES,
+  nextAppVersion,
+  runAppUpdate,
+  updatePhaseLabel,
+  type AppUpdateState,
+} from '../appUpdate'
 import type { Device } from '../nav'
 
 export function SettingsView() {
   const { navigate, devices, removeDevice, pets, account, signOut } = useApp()
   const [notifications, setNotifications] = useState(true)
   const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null)
+
+  // —— 应用内更新（demo 模拟）——
+  const currentVersion = __APP_VERSION__
+  const [updatedVersion, setUpdatedVersion] = useState<string | null>(null)
+  const [updateSheetOpen, setUpdateSheetOpen] = useState(false)
+  const [updateState, setUpdateState] = useState<AppUpdateState>({ phase: 'checking', progress: 0 })
+  const cancelUpdateRef = useRef<(() => void) | null>(null)
+
+  const version = updatedVersion ?? currentVersion
+  const nextVersion = nextAppVersion(currentVersion)
+  const updateDone = updateState.phase === 'done'
+
+  useEffect(
+    () => () => {
+      cancelUpdateRef.current?.()
+    },
+    [],
+  )
+
+  function startUpdate() {
+    setUpdateSheetOpen(true)
+    setUpdateState({ phase: 'checking', progress: 0 })
+    cancelUpdateRef.current?.()
+    cancelUpdateRef.current = runAppUpdate((state) => {
+      setUpdateState(state)
+      if (state.phase === 'done') {
+        setUpdatedVersion(nextVersion)
+      }
+    })
+  }
+
+  function closeUpdateSheet() {
+    if (!updateDone) {
+      return // 更新进行中不允许关闭，避免半途而废
+    }
+    setUpdateSheetOpen(false)
+  }
 
   return (
     <>
@@ -133,6 +189,19 @@ export function SettingsView() {
             <p className="m-0 text-xs leading-5 text-[#171717]/50">
               公司：上海硅宠场域科技有限公司
             </p>
+            <div className="mt-1 flex items-center justify-between">
+              <p className="m-0 text-xs leading-5 text-[#171717]/50">版本：{version}</p>
+              {!updatedVersion && (
+                <button
+                  type="button"
+                  onClick={startUpdate}
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-700 transition hover:bg-emerald-200"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  新版本 v{nextVersion} · 点击更新
+                </button>
+              )}
+            </div>
           </div>
         </section>
 
@@ -185,6 +254,84 @@ export function SettingsView() {
             >
               取消
             </button>
+          </section>
+        </div>
+      )}
+
+      {updateSheetOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          {updateDone ? (
+            <button
+              type="button"
+              aria-label="关闭"
+              onClick={closeUpdateSheet}
+              className="absolute inset-0 bg-black/40"
+            />
+          ) : (
+            <span className="absolute inset-0 bg-black/40" />
+          )}
+          <section className="relative safe-bottom-lg rounded-t-2xl bg-white px-5 pt-4">
+            <span className="mx-auto block h-1 w-10 rounded-full bg-[#171717]/15" />
+            <div className="mt-4 flex items-start gap-3">
+              <span
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
+                  updateDone ? 'bg-emerald-100 text-emerald-600' : 'bg-[#171717]/5 text-[#171717]'
+                }`}
+              >
+                {updateDone ? (
+                  <CircleCheck size={19} />
+                ) : (
+                  <Download size={19} className={updateState.phase === 'downloading' ? 'animate-pulse' : ''} />
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="m-0 text-base font-semibold">
+                  {updateDone ? `已更新至 v${nextVersion}` : `发现新版本 v${nextVersion}`}
+                </h2>
+                <p className="m-0 mt-1 text-xs leading-5 text-[#171717]/55">
+                  {updateDone
+                    ? '更新内容已生效，尽情探索新的星际旅程。'
+                    : updatePhaseLabel[updateState.phase]}
+                </p>
+                {!updateDone && updateState.phase === 'checking' && (
+                  <ul className="m-0 mt-2 list-disc pl-4 text-xs leading-5 text-[#171717]/45">
+                    {APP_UPDATE_NOTES.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {!updateDone ? (
+              <div className="mt-4">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#171717]/10">
+                  <div
+                    className="h-full rounded-full bg-[#171717] transition-[width] duration-200"
+                    style={{
+                      width: `${updateState.phase === 'downloading' ? updateState.progress : 0}%`,
+                    }}
+                  />
+                </div>
+                <p className="m-0 mt-1.5 flex items-center gap-1 text-[11px] text-[#171717]/45">
+                  {updateState.phase === 'downloading' && (
+                    <>
+                      <LoaderCircle size={11} className="animate-spin" />
+                      {updateState.progress}%
+                    </>
+                  )}
+                  {updateState.phase !== 'downloading' && updatePhaseLabel[updateState.phase]}
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={closeUpdateSheet}
+                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#171717] text-sm font-medium text-white hover:bg-[#171717]/85"
+              >
+                好的
+              </button>
+            )}
           </section>
         </div>
       )}
