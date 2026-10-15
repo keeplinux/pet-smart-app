@@ -1,8 +1,9 @@
 import type { Device, Pet } from './nav'
 import { products } from './catalog'
 
-// v2：设备初始状态重构（预置未绑定饮水机），升级 key 使旧设备数据失效、回到新初始态
-const deviceStorageKey = 'pet-smart-app:devices-v2'
+// v3：设备初始态演示修复——升级 key 使上一版本测试期间绑定的设备数据失效，
+// 新版本回到「未绑定饮水舱」初始态；同版本会话内绑定仍正常持久化
+const deviceStorageKey = 'pet-smart-app:devices-v3'
 const petStorageKey = 'pet-smart-app:pets'
 
 /** 历史产品名：持久化设备若仍带着旧名，读取时迁移为 catalog 当前名 */

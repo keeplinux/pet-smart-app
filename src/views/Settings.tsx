@@ -162,7 +162,7 @@ export function SettingsView() {
                 {device.status === 'unbound' && (
                   <button
                     type="button"
-                    onClick={() => navigate({ name: 'scan' })}
+                    onClick={() => navigate({ name: 'scan', expectProductId: device.productId })}
                     className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#171717]/5 text-xs font-medium hover:bg-[#171717]/10"
                   >
                     <QrCode size={14} /> 扫码绑定

@@ -3,7 +3,7 @@ export type View =
   | { name: 'home' }
   | { name: 'mall' }
   | { name: 'purchase'; productId: string }
-  | { name: 'scan' }
+  | { name: 'scan'; expectProductId?: string }
   | { name: 'hotspot' }
   | { name: 'provision'; payload: QrPayload; source: ProvisionSource }
   | { name: 'settings' }

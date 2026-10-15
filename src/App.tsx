@@ -42,7 +42,7 @@ function renderView(view: View): ReactNode {
     case 'purchase':
       return <PurchaseView productId={view.productId} />
     case 'scan':
-      return <ScanView />
+      return <ScanView expectProductId={view.expectProductId} />
     case 'hotspot':
       return <HotspotBindView />
     case 'provision':

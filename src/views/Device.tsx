@@ -151,7 +151,7 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
             </div>
             <button
               type="button"
-              onClick={() => navigate({ name: 'scan' })}
+              onClick={() => navigate({ name: 'scan', expectProductId: device.productId })}
               className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-[#171717] text-sm font-medium text-white hover:bg-[#171717]/85"
             >
               <QrCode size={15} /> 扫码绑定

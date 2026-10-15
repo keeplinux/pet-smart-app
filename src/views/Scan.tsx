@@ -55,9 +55,12 @@ const hotspotLabels = ['热点发现', '会话校验', 'WiFi 配网', '绑定完
 export function ScanView({
   initialPayload,
   source = 'scan',
+  expectProductId,
 }: {
   initialPayload?: QrPayload
   source?: ProvisionSource
+  /** 从未绑定设备的「扫码绑定」入口进入时锁定产品型号，只识别该产品 */
+  expectProductId?: string
 }) {
   const { navigate, devices, addDevice } = useApp()
   const [phase, setPhase] = useState<Phase>(() => {
@@ -76,6 +79,8 @@ export function ScanView({
   const [showPassword, setShowPassword] = useState(false)
   const [wifiError, setWifiError] = useState<string | null>(null)
   const [fallbackPrompt, setFallbackPrompt] = useState(false)
+  // 本次扫码会话开始前设备是否已绑定（用于成功页「更新绑定信息」提示）
+  const [ownedAtSession, setOwnedAtSession] = useState(false)
   const recognizeTimer = useRef<number | undefined>(undefined)
 
   const labels = source === 'hotspot' ? hotspotLabels : scanLabels
@@ -95,6 +100,19 @@ export function ScanView({
 
   // 各阶段均为分步流程，阶段变化时自动驱动
   useEffect(() => {
+    if (phase.name === 'success') {
+      // 配网成功即写入绑定：之后无论点「完成」「再配一台」还是直接返回，
+      // 已成功的绑定都不会丢失（addDevice 按 sn 幂等 upsert）
+      addDevice({
+        productId: phase.payload.productId,
+        sn: phase.payload.sn,
+        mac: phase.payload.mac,
+        wifiSsid: phase.result.ssid,
+        status: 'bound',
+        source,
+      })
+      return undefined
+    }
     if (phase.name === 'ble') {
       return runSimSteps(bleSteps, {
         onStep: setStepIndex,
@@ -128,12 +146,14 @@ export function ScanView({
       )
     }
     return undefined
-  }, [phase, fail])
+  }, [phase, fail, addDevice, source])
 
   function beginSession(payload: QrPayload) {
     setRssi(randomRssi())
     setStepIndex(0)
     setFallbackPrompt(false)
+    // 快照会话开始前的绑定状态：成功页的「已在设备列表」提示不受本次会话写入影响
+    setOwnedAtSession(devices.some((device) => device.sn === payload.sn && device.status === 'bound'))
     setPhase(source === 'hotspot' ? { name: 'hotspot', payload } : { name: 'ble', payload })
   }
 
@@ -144,7 +164,7 @@ export function ScanView({
     setRecognizing(true)
     recognizeTimer.current = window.setTimeout(() => {
       setRecognizing(false)
-      beginSession(simulateQrRecognition())
+      beginSession(simulateQrRecognition(expectProductId))
     }, scanRecognizeMs)
   }
 
@@ -177,14 +197,7 @@ export function ScanView({
     if (phase.name !== 'success') {
       return
     }
-    addDevice({
-      productId: phase.payload.productId,
-      sn: phase.payload.sn,
-      mac: phase.payload.mac,
-      wifiSsid: phase.result.ssid,
-      status: 'bound',
-      source,
-    })
+    // 绑定已在配网成功时写入，这里只负责返回首页
     navigate({ name: 'home' })
   }
 
@@ -224,7 +237,7 @@ export function ScanView({
       <StepBar labels={labels} current={wizardIndex()} completed={phase.name === 'success'} />
       <main className="flex flex-1 flex-col items-center gap-4 overflow-y-auto p-4 safe-bottom">
         {phase.name === 'scan' && (
-          <ScanPanel recognizing={recognizing} onStart={startRecognize} />
+          <ScanPanel recognizing={recognizing} onStart={startRecognize} expectProductId={expectProductId} />
         )}
         {phase.name === 'ble' && (
           <SessionPanel
@@ -279,11 +292,11 @@ export function ScanView({
             payload={phase.payload}
             source={source}
             result={phase.result}
-            owned={devices.some((device) => device.sn === phase.payload.sn && device.status === 'bound')}
+            owned={ownedAtSession}
             onFinish={finishBinding}
             onAgain={() => {
               if (initialPayload) {
-                navigate({ name: 'scan' })
+                navigate({ name: 'scan', expectProductId })
                 return
               }
               resetWizard()
@@ -298,7 +311,7 @@ export function ScanView({
             onBackToWifi={() => setPhase({ name: 'wifi', payload: phase.payload })}
             onRescan={() => {
               if (initialPayload) {
-                navigate({ name: 'scan' })
+                navigate({ name: 'scan', expectProductId })
                 return
               }
               resetWizard()
@@ -363,11 +376,14 @@ function StepBar({
 function ScanPanel({
   recognizing,
   onStart,
+  expectProductId,
 }: {
   recognizing: boolean
   onStart: () => void
+  expectProductId?: string
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const expected = products.find((item) => item.id === expectProductId)
 
   return (
     <>
@@ -393,7 +409,7 @@ function ScanPanel({
         )}
 
         <span className="absolute inset-x-0 bottom-6 mx-auto w-fit rounded-full bg-white/12 px-3 py-1 text-[10px] text-white/80">
-          将二维码放入框内
+          {expected ? `将${expected.name}机身二维码放入框内` : '将二维码放入框内'}
         </span>
       </button>
 

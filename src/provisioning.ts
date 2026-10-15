@@ -295,9 +295,14 @@ export function parseQrPayload(raw: string): QrPayload | null {
  * 尚未接入相机解码能力时使用：先按产品型号生成标准二维码内容，
  * 再交给真实的 parseQrPayload 解析，保证下行链路与真机完全一致。
  * 真机上改为把相机识别到的原始字符串传进 parseQrPayload 即可。
+ *
+ * expectProductId：从某台未绑定设备的「扫码绑定」入口进入时锁定产品型号，
+ * 只会识别为该产品（如饮水舱绑定入口只识别饮水舱二维码）。
  */
-export function simulateQrRecognition(): QrPayload {
-  const product = products[Math.floor(Math.random() * products.length)]
+export function simulateQrRecognition(expectProductId?: string): QrPayload {
+  const product = expectProductId
+    ? (products.find((item) => item.id === expectProductId) ?? products[0])
+    : products[Math.floor(Math.random() * products.length)]
   const sn = randomSn()
   const encoded = formatQrPayload({
     productId: product.id,
