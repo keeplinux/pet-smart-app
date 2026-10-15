@@ -17,12 +17,14 @@
   `AppData/Local/Temp/logo-work/gen_icons.py` 脚本生成（mipmap 全密度 + splash 全方向 + `public/brand/logo.png`）。
 
 ## 首页 3D 星球（HomeScene.tsx 关键机制）
-- **构图用 `camera.setViewOffset` 动态偏移，不移动相机/target**：OrbitControls `target` 恒为球心，
-  旋转/缩放/拾取锚点稳定。`applyCompose()` 每帧调用：`factor = 0.192 × clamp((9.6 - dist)/(9.6 - anchor), 0, 1)`，
-  默认距离（anchor）保持海平面构图（星空约 30%），拉远到 MAX_DISTANCE=9.6 时星球完全居中。
-- **视角自动记忆**：`VIEW_STORAGE_KEY = 'pet-smart-app:home-view'`；controls `'end'` 后 800ms 防抖保存
-  camera.position；启动恢复用户最优视角，无记录用默认 45° 斜俯视 `(0, 5.6, 5.6)`。
-- 灵敏度已收紧（rotateSpeed 0.45 / zoomSpeed 0.6 / minDistance 4.6）——用户明确「轻滑不能甩到很远的视角」。
+- **拖动 = 直接操纵转球**（v1.1.2 起，用户要求方向一致手感）：星空是背景幕不转；planet+内容在
+  `planetGroup`，拖拽按**屏幕轴**旋转（相机 right/up 世界向量），内容移动方向与手指滑动方向严格一致，
+  无斜向漂移。OrbitControls `enableRotate=false` 只管缩放（zoomSpeed 0.6 / min 4.6 / max 9.6）；
+  自写 pointer 拖拽 + 惯性滑行（×0.92/帧）；灵敏度 `PLANET_DRAG_SPEED=0.35`（拖满屏高约 126°）。
+- **构图用 `camera.setViewOffset` 动态偏移**：`factor = 0.192 × clamp((9.6 - dist)/(9.6 - anchor), 0, 1)`，
+  默认距离保持海平面构图（星空约 30%），拉远到 MAX_DISTANCE=9.6 时星球完全居中。
+- **视角+姿态自动记忆**：`VIEW_STORAGE_KEY`；存 `{camera, planet: quaternion}`（旧格式 {x,y,z} 兼容）；
+  拖拽/缩放结束 800ms 防抖保存；启动恢复相机位置与星球姿态。
 - 饮水舱固定在海平面轮廓 `[4.3, 0.6]`，猫 `[4.55, 0.52]` 在旁；新增设备落位改 `deviceSpherical` 表。
 
 ## 项目定位

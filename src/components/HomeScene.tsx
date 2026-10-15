@@ -11,6 +11,8 @@ const DEFAULT_CAMERA = { x: 0, y: 5.6, z: 5.6 }
 const VIEW_STORAGE_KEY = 'pet-smart-app:home-view'
 const MAX_DISTANCE = 9.6
 const COMPOSE_FACTOR = 0.192
+/** 直接操纵手感：拖动星球本身的灵敏度（拖满一屏高度约转 0.35 × 2π 弧度） */
+const PLANET_DRAG_SPEED = 0.35
 
 const catColors = ['#e08a4e', '#7f9cf5', '#b47ad4', '#5bb5a0']
 
@@ -61,6 +63,7 @@ type SceneState = {
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
   controls: OrbitControls
+  planetGroup: THREE.Group
   contentGroup: THREE.Group
   cats: CatRig[]
   deviceGroups: THREE.Object3D[]
@@ -104,7 +107,7 @@ export function HomeScene({
     // 45° 斜俯视看向星球中心；若用户此前调整过视角（自动记忆），直接恢复其最优视角
     const savedView = readSavedView()
     if (savedView) {
-      camera.position.set(savedView.x, savedView.y, savedView.z)
+      camera.position.set(savedView.camera.x, savedView.camera.y, savedView.camera.z)
     } else {
       camera.position.set(DEFAULT_CAMERA.x, DEFAULT_CAMERA.y, DEFAULT_CAMERA.z)
     }
@@ -122,41 +125,109 @@ export function HomeScene({
     sun.position.set(8, 6, 5)
     scene.add(sun)
 
-    const staticGroup = new THREE.Group()
-    staticGroup.add(createStars())
-    staticGroup.add(createPlanet())
-    scene.add(staticGroup)
+    // 星空是背景幕（不随拖动旋转）；星球与设备/宠物放进同一个可旋转组，
+    // 拖动 = 直接转动星球本身，内容移动方向与手指滑动方向严格对齐
+    const stars = createStars()
+    scene.add(stars)
+    const planetGroup = new THREE.Group()
+    planetGroup.add(createPlanet())
+    scene.add(planetGroup)
 
     const contentGroup = new THREE.Group()
-    scene.add(contentGroup)
+    planetGroup.add(contentGroup)
+
+    // 恢复用户上次转动后的星球姿态（无记忆时保持默认姿态）
+    if (savedView?.planet) {
+      planetGroup.quaternion.set(
+        savedView.planet.x,
+        savedView.planet.y,
+        savedView.planet.z,
+        savedView.planet.w,
+      )
+    }
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.target.set(0, 0, 0)
     controls.enableDamping = true
     controls.enablePan = false
-    // 灵敏度收紧：轻滑不会一下转到很远的视角
-    controls.rotateSpeed = 0.45
+    // 旋转改为「直接操纵星球」（自实现拖拽，见下方 pointer 监听）；
+    // OrbitControls 只负责双指捏合 / 滚轮缩放，缩放灵敏度收紧防过冲
+    controls.enableRotate = false
     controls.zoomSpeed = 0.6
     controls.minDistance = 4.6
     controls.maxDistance = MAX_DISTANCE
 
-    // 用户调整结束后（等阻尼惯性动画稳定）自动记忆视角，
-    // 之后每次打开 App 都以其最优视角作为默认视角
+    // 视角与星球姿态自动记忆：缩放结束或拖拽结束后（等惯性稳定）保存，
+    // 之后每次打开 App 都恢复用户上次调整好的状态
     let saveViewTimer = 0
-    controls.addEventListener('end', () => {
+    const saveCurrentView = () => {
       window.clearTimeout(saveViewTimer)
       saveViewTimer = window.setTimeout(() => {
-        saveView(camera.position)
+        saveView(camera.position, planetGroup.quaternion)
       }, 800)
-    })
+    }
+    controls.addEventListener('end', saveCurrentView)
 
     const raycaster = new THREE.Raycaster()
     let downX = 0
     let downY = 0
 
+    // —— 直接操纵拖拽：转星球、不转相机 ——
+    // 旋转轴取屏幕竖直/水平轴（相机 right/up 在世界系的朝向），
+    // 因此球面内容始终沿手指滑动的方向移动，不会出现斜向漂移
+    let dragging = false
+    let dragPointerId = -1
+    let lastDragX = 0
+    let lastDragY = 0
+    let inertiaX = 0
+    let inertiaY = 0
+    const axisRight = new THREE.Vector3()
+    const axisUp = new THREE.Vector3()
+
+    const rotatePlanet = (ax: number, ay: number) => {
+      if (!ax && !ay) return
+      axisRight.setFromMatrixColumn(camera.matrixWorld, 0)
+      axisUp.setFromMatrixColumn(camera.matrixWorld, 1)
+      planetGroup.rotateOnWorldAxis(axisUp, ax)
+      planetGroup.rotateOnWorldAxis(axisRight, ay)
+    }
+
     function handlePointerDown(event: PointerEvent) {
       downX = event.clientX
       downY = event.clientY
+      // 第二根手指按下时交给 OrbitControls 做双指缩放，暂停拖拽旋转
+      if (!event.isPrimary) {
+        dragging = false
+        return
+      }
+      dragging = true
+      dragPointerId = event.pointerId
+      lastDragX = event.clientX
+      lastDragY = event.clientY
+      inertiaX = 0
+      inertiaY = 0
+      renderer.domElement.setPointerCapture(event.pointerId)
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (!dragging || event.pointerId !== dragPointerId) return
+      const dx = event.clientX - lastDragX
+      const dy = event.clientY - lastDragY
+      lastDragX = event.clientX
+      lastDragY = event.clientY
+      const k =
+        (Math.PI * 2 * PLANET_DRAG_SPEED) / Math.max(1, renderer.domElement.clientHeight)
+      rotatePlanet(dx * k, dy * k)
+      // 平滑记录惯性角速度，松手后星球按此速度自然滑行减速
+      inertiaX = inertiaX * 0.5 + dx * k * 0.5
+      inertiaY = inertiaY * 0.5 + dy * k * 0.5
+    }
+
+    function handlePointerUp(event: PointerEvent) {
+      if (event.pointerId !== dragPointerId) return
+      dragging = false
+      dragPointerId = -1
+      saveCurrentView()
     }
 
     function handleClick(event: MouseEvent) {
@@ -183,11 +254,14 @@ export function HomeScene({
     }
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
+    renderer.domElement.addEventListener('pointermove', handlePointerMove)
+    renderer.domElement.addEventListener('pointerup', handlePointerUp)
+    renderer.domElement.addEventListener('pointercancel', handlePointerUp)
     renderer.domElement.addEventListener('click', handleClick)
 
     // 动态构图：默认距离下视口向上取景约 19%（顶部星空约占 30%、海平面构图），
     // 拉远时 offset 随距离线性衰减，缩到 MAX_DISTANCE（最远）时星球完全居中；
-    // 旋转轴（OrbitControls target）始终锚定星球中心，与取景偏移互不干扰
+    // 构图只随缩放距离变化，拖拽旋转星球不影响取景
     const applyCompose = () => {
       const width = mount.clientWidth
       const height = mount.clientHeight
@@ -223,6 +297,14 @@ export function HomeScene({
         state.cats.forEach((cat) => updateCat(cat, dt, time, state.hasWater))
       }
       controls.update()
+      // 松手后星球按惯性滑行并逐帧减速，模拟真实转球手感
+      if (!dragging) {
+        rotatePlanet(inertiaX, inertiaY)
+        inertiaX *= 0.92
+        inertiaY *= 0.92
+        if (Math.abs(inertiaX) < 1e-5) inertiaX = 0
+        if (Math.abs(inertiaY) < 1e-5) inertiaY = 0
+      }
       applyCompose()
       renderer.render(scene, camera)
     })
@@ -232,6 +314,7 @@ export function HomeScene({
       scene,
       camera,
       controls,
+      planetGroup,
       contentGroup,
       cats: [],
       deviceGroups: [],
@@ -244,9 +327,12 @@ export function HomeScene({
       controls.dispose()
       resizeObserver.disconnect()
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove)
+      renderer.domElement.removeEventListener('pointerup', handlePointerUp)
+      renderer.domElement.removeEventListener('pointercancel', handlePointerUp)
       renderer.domElement.removeEventListener('click', handleClick)
-      disposeObject(staticGroup)
-      disposeObject(contentGroup)
+      disposeObject(stars)
+      disposeObject(planetGroup)
       renderer.dispose()
       sceneRef.current = null
       if (renderer.domElement.parentElement === mount) {
@@ -605,31 +691,58 @@ function createDeviceModel(kind: DeviceKind): THREE.Group {
   return group
 }
 
-/** 读取用户上次调整并固化的最优视角（localStorage），无记录或数据损坏时返回 null */
-function readSavedView(): { x: number; y: number; z: number } | null {
+type SavedView = {
+  camera: { x: number; y: number; z: number }
+  planet: { x: number; y: number; z: number; w: number } | null
+}
+
+/** 读取用户上次固化的视角与星球姿态（localStorage）；无记录或数据损坏时返回 null */
+function readSavedView(): SavedView | null {
   try {
     const raw = window.localStorage.getItem(VIEW_STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown; z?: unknown }
-    if (
-      typeof parsed.x !== 'number' ||
-      typeof parsed.y !== 'number' ||
-      typeof parsed.z !== 'number'
-    ) {
-      return null
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    // 兼容旧格式 {x,y,z}（仅相机位置，无星球姿态）
+    if (isVec3(parsed)) {
+      return { camera: { x: parsed.x, y: parsed.y, z: parsed.z }, planet: null }
     }
-    return parsed as { x: number; y: number; z: number }
+    const cam = parsed.camera as Record<string, unknown> | undefined
+    if (!cam || !isVec3(cam)) return null
+    const p = parsed.planet as Record<string, unknown> | undefined
+    const planet =
+      p &&
+      typeof p.x === 'number' &&
+      typeof p.y === 'number' &&
+      typeof p.z === 'number' &&
+      typeof p.w === 'number'
+        ? { x: p.x, y: p.y, z: p.z, w: p.w }
+        : null
+    return { camera: { x: cam.x, y: cam.y, z: cam.z }, planet }
   } catch {
     return null
   }
 }
 
-/** 固化当前相机位置为下次启动的默认视角；存储不可用时静默忽略 */
-function saveView(position: THREE.Vector3) {
+function isVec3(value: Record<string, unknown>): value is { x: number; y: number; z: number } {
+  return (
+    typeof value.x === 'number' && typeof value.y === 'number' && typeof value.z === 'number'
+  )
+}
+
+/** 固化相机位置与星球旋转姿态；存储不可用时静默忽略 */
+function saveView(position: THREE.Vector3, planetRotation: THREE.Quaternion) {
   try {
     window.localStorage.setItem(
       VIEW_STORAGE_KEY,
-      JSON.stringify({ x: position.x, y: position.y, z: position.z }),
+      JSON.stringify({
+        camera: { x: position.x, y: position.y, z: position.z },
+        planet: {
+          x: planetRotation.x,
+          y: planetRotation.y,
+          z: planetRotation.z,
+          w: planetRotation.w,
+        },
+      }),
     )
   } catch {
     // localStorage 不可用（如隐私模式）时忽略，不影响交互
