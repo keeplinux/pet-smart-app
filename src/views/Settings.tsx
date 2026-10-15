@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Bell, Info, LogOut, Trash2, User, Wifi } from 'lucide-react'
+import { Bell, ChevronRight, Info, LogOut, Trash2, Wifi } from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
 import { payloadFromDevice, statusLabel } from '../provisioning'
+import { getAvatarPreset } from '../avatars'
 
 export function SettingsView() {
   const { navigate, devices, removeDevice, pets, account, signOut } = useApp()
@@ -12,23 +13,39 @@ export function SettingsView() {
     <>
       <TopBar title="设置" onBack={() => navigate({ name: 'home' })} />
       <main className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 safe-bottom">
-        <section className="flex items-center gap-3 rounded-lg p-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#171717]/5">
-            <User size={20} />
-          </span>
-          <div>
-            <p className="m-0 text-sm font-medium">用户账号</p>
-            {account ? (
+        <section className="rounded-lg p-0">
+          <button
+            type="button"
+            onClick={() => navigate({ name: 'avatarPicker' })}
+            className="flex w-full items-center gap-3 rounded-lg p-4 text-left hover:bg-[#171717]/3"
+          >
+            {(() => {
+              const preset = getAvatarPreset(account?.avatarId)
+              const Icon = preset.icon
+              return (
+                <span
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
+                  style={{ backgroundColor: preset.bg, color: preset.fg }}
+                >
+                  <Icon size={21} strokeWidth={1.8} />
+                </span>
+              )
+            })()}
+            <div className="min-w-0 flex-1">
+              <p className="m-0 text-sm font-medium">用户账号</p>
+              {account ? (
+                <p className="m-0 text-xs text-[#171717]/45">
+                  {account.method === 'phone' ? '本机手机号' : '微信账户'}：{account.identifier}
+                </p>
+              ) : (
+                <p className="m-0 text-xs text-[#171717]/45">未登录</p>
+              )}
               <p className="m-0 text-xs text-[#171717]/45">
-                {account.method === 'phone' ? '本机手机号' : '微信账户'}：{account.identifier}
+                {pets.length > 0 ? `已录入宠物：${pets.length} 只` : '未录入宠物数字形象'}
               </p>
-            ) : (
-              <p className="m-0 text-xs text-[#171717]/45">未登录</p>
-            )}
-            <p className="m-0 text-xs text-[#171717]/45">
-              {pets.length > 0 ? `已录入宠物：${pets.length} 只` : '未录入宠物数字形象'}
-            </p>
-          </div>
+            </div>
+            <ChevronRight size={18} className="shrink-0 text-[#171717]/35" />
+          </button>
         </section>
 
         <section className="rounded-lg p-2">

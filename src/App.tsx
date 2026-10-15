@@ -6,6 +6,7 @@ import { clearStoredAccount, readStoredAccount, storeAccount } from './auth'
 import type { Account, Device, DeviceInput, Pet, View } from './nav'
 import { buildDevice } from './provisioning'
 import { clearStoredDevices, readStoredDevices, storeDevices } from './storage'
+import { AvatarPickerView } from './views/AvatarPicker'
 import { DeviceView } from './views/Device'
 import { Home } from './views/Home'
 import { HotspotBindView } from './views/HotspotBind'
@@ -45,6 +46,8 @@ function renderView(view: View): ReactNode {
       return <ScanView initialPayload={view.payload} source={view.source} />
     case 'settings':
       return <SettingsView />
+    case 'avatarPicker':
+      return <AvatarPickerView />
     case 'device':
       return <DeviceView deviceId={view.deviceId} />
     case 'petCapture':
@@ -100,6 +103,20 @@ function App() {
     setView({ name: 'home' })
   }, [])
 
+  const updateAccount = useCallback(
+    (patch: Partial<Account>) => {
+      setAccount((prev) => {
+        if (!prev) {
+          return prev
+        }
+        const next = { ...prev, ...patch }
+        storeAccount(next)
+        return next
+      })
+    },
+    [],
+  )
+
   const signOut = useCallback(() => {
     clearStoredAccount()
     clearStoredDevices()
@@ -123,9 +140,10 @@ function App() {
       addPet,
       account,
       signIn,
+      updateAccount,
       signOut,
     }),
-    [view, navigate, devices, addDevice, removeDevice, pets, addPet, account, signIn, signOut],
+    [view, navigate, devices, addDevice, removeDevice, pets, addPet, account, signIn, updateAccount, signOut],
   )
 
   return (

@@ -12,6 +12,8 @@ export type AppApi = {
   addPet: (pet: Pet) => void
   account: Account | null
   signIn: (account: Account) => void
+  /** 更新当前账号资料（如头像），并随账号持久化 */
+  updateAccount: (patch: Partial<Account>) => void
   signOut: () => void
 }
 

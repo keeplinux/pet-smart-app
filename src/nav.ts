@@ -7,6 +7,7 @@ export type View =
   | { name: 'hotspot' }
   | { name: 'provision'; payload: QrPayload; source: ProvisionSource }
   | { name: 'settings' }
+  | { name: 'avatarPicker' }
   | { name: 'device'; deviceId: string }
   | { name: 'petCapture' }
 
@@ -16,6 +17,8 @@ export type Account = {
   id: string
   method: AccountMethod
   identifier: string
+  /** 用户资料头像（预设形象 id），见 src/avatars.ts */
+  avatarId?: string
 }
 
 export type DeviceKind = 'water' | 'feeder' | 'litter' | 'camera' | 'tracker' | 'generic'
