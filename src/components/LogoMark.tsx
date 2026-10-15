@@ -1,5 +1,5 @@
 export function LogoMark({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const sizeClass = size === 'lg' ? 'h-24' : size === 'sm' ? 'h-8' : 'h-12'
+  const sizeClass = size === 'lg' ? 'h-24' : size === 'sm' ? 'h-[19.2px]' : 'h-12'
 
   return (
     <svg

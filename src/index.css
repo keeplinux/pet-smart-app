@@ -65,10 +65,11 @@ button:focus-visible {
 
 /*
  * 安全区适配：顶栏避开灵动岛 / 状态栏，底栏与弹层避开 home 指示条。
- * 非全面屏机型上 env() 为 0，退化为常规留白。
+ * 部分安卓 WebView 不上报 safe-area inset（env() 为 0），用 28px 兜底，
+ * 加 12px 呼吸留白；env() 正常的机型视觉与之前完全一致。
  */
 .safe-top {
-  padding-top: calc(env(safe-area-inset-top) + 12px);
+  padding-top: calc(max(env(safe-area-inset-top), 28px) + 12px);
 }
 
 .safe-bottom {
