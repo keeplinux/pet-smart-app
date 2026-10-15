@@ -3,7 +3,7 @@ export function LogoMark({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
 
   return (
     <svg
-      viewBox="0 0 868 672"
+      viewBox="0 0 768 403"
       fill="currentColor"
       role="img"
       aria-label="硅宠场域商标图案"
