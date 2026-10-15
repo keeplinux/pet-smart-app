@@ -26,22 +26,11 @@ export function PetProfileView({ petId }: { petId: string }) {
     <>
       <TopBar title={pet.name} onBack={() => navigate({ name: 'home' })} />
       <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 safe-bottom">
-        {/* 服务器回传的 3D 形象 */}
+        {/* 服务器回传的 3D 形象（模型生成成功后不再回显采集的四视图/视频） */}
         <section className="flex aspect-square w-full max-w-sm flex-col items-center justify-center overflow-hidden self-center rounded-lg border border-[#171717]/10 bg-white">
           <PetModelStage pet={pet} />
           <p className="m-0 pb-3 text-[11px] text-[#171717]/40">服务器构建的 3D 形象 · 自动旋转</p>
         </section>
-
-        {pet.media?.kind === 'photos' && (
-          <PetPhotoGrid pet={pet} media={pet.media} />
-        )}
-        {pet.media?.kind === 'video' && (
-          <video
-            src={pet.media.url}
-            controls
-            className="max-h-56 w-full max-w-sm self-center rounded-lg border border-[#171717]/10"
-          />
-        )}
 
         {/* 录入资料 */}
         <section className="flex w-full max-w-sm flex-col self-center rounded-lg bg-[#171717]/3 p-4">
@@ -73,30 +62,6 @@ const patternLabel = {
   socks: '白袜子',
   patch: '补丁',
 } as const
-
-/** 录入的四视图照片回显（2×2 宫格） */
-function PetPhotoGrid({ pet, media }: { pet: Pet; media: Extract<Pet['media'], { kind: 'photos' }> }) {
-  const slots = [
-    ['front', '正视图'],
-    ['left', '左侧视图'],
-    ['right', '右侧视图'],
-    ['back', '后背视图'],
-  ] as const
-  return (
-    <div className="grid w-full max-w-sm grid-cols-2 self-center gap-2">
-      {slots.map(([key, label]) => (
-        <figure key={key} className="m-0">
-          <img
-            src={media[key]}
-            alt={`${pet.name} ${label}`}
-            className="aspect-square w-full rounded-lg border border-[#171717]/10 object-cover"
-          />
-          <figcaption className="mt-1 text-center text-[11px] text-[#171717]/45">{label}</figcaption>
-        </figure>
-      ))}
-    </div>
-  )
-}
 
 /** 独立的迷你 3D 展示台：自动缓慢旋转展示宠物模型 */
 function PetModelStage({ pet }: { pet: Pet }) {

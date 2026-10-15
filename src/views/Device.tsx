@@ -199,16 +199,20 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
             <WaterDataAnalysis pets={pets} />
 
             <div className="flex items-center justify-center gap-12">
-              <Metric label="剩余水量" value={`${data.waterLevelPercent}%`} sub={data.waterLevelText} />
+              <Metric
+                label="剩余水量"
+                value={formatMetric(data.waterLevelPercent, '%')}
+                sub={data.waterLevelText ?? undefined}
+              />
               <Metric
                 label="水温"
-                value={`${data.waterTemperatureC}°C`}
-                sub={data.waterTemperatureText}
+                value={formatMetric(data.waterTemperatureC, '°C')}
+                sub={data.waterTemperatureText ?? undefined}
               />
               <Metric
                 label="水质"
-                value={`${data.waterQualityPercent}%`}
-                sub={data.waterQualityText}
+                value={formatMetric(data.waterQualityPercent, '%')}
+                sub={data.waterQualityText ?? undefined}
               />
             </div>
 
@@ -625,6 +629,11 @@ function HistoryPlayer({
       <ClipList clips={day.clips} activeStart={activeClip?.start ?? null} onSelect={jumpToClip} />
     </div>
   )
+}
+
+/** 设备读数格式化：无数据（null）时显示空白占位 */
+function formatMetric(value: number | null, unit: string): string {
+  return value == null ? '--' : `${value}${unit}`
 }
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
