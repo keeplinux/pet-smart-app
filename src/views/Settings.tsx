@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { ArrowRight, Bell, Info, LogOut, Trash2, User, Wifi } from 'lucide-react'
+import { Bell, Info, LogOut, Trash2, User, Wifi } from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
 import { payloadFromDevice, statusLabel } from '../provisioning'
-import { HOTSPOT_SSID } from '../hotspot'
 
 export function SettingsView() {
   const { navigate, devices, removeDevice, pets, account, signOut } = useApp()
@@ -13,7 +12,7 @@ export function SettingsView() {
     <>
       <TopBar title="设置" onBack={() => navigate({ name: 'home' })} />
       <main className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 safe-bottom">
-        <section className="flex items-center gap-3 rounded-lg border border-[#171717]/10 bg-white p-4">
+        <section className="flex items-center gap-3 rounded-lg p-4">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#171717]/5">
             <User size={20} />
           </span>
@@ -32,7 +31,7 @@ export function SettingsView() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-[#171717]/10 bg-white p-2">
+        <section className="rounded-lg p-2">
           <button
             type="button"
             role="switch"
@@ -58,7 +57,7 @@ export function SettingsView() {
           </button>
         </section>
 
-        <section className="rounded-lg border border-[#171717]/10 bg-white p-2">
+        <section className="rounded-lg p-2">
           <p className="px-3 pt-2 text-xs text-[#171717]/45">设备管理</p>
           {devices.length === 0 ? (
             <p className="px-3 pb-3 text-sm text-[#171717]/45">暂无设备</p>
@@ -103,7 +102,7 @@ export function SettingsView() {
                         source: 'hotspot',
                       })
                     }
-                    className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#171717]/15 text-xs font-medium hover:bg-[#171717]/5"
+                    className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#171717]/5 text-xs font-medium hover:bg-[#171717]/10"
                   >
                     <Wifi size={14} /> 手动配网
                   </button>
@@ -113,27 +112,7 @@ export function SettingsView() {
           )}
         </section>
 
-        <section className="rounded-lg border border-[#171717]/10 bg-white p-2">
-          <p className="px-3 pt-2 text-xs text-[#171717]/45">配网遇到问题</p>
-          <button
-            type="button"
-            onClick={() => navigate({ name: 'hotspot' })}
-            className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left hover:bg-[#171717]/3"
-          >
-            <span className="flex min-w-0 items-center gap-3">
-              <Wifi size={18} className="shrink-0" />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium">用保底热点配网</span>
-                <span className="mt-0.5 block text-xs leading-5 text-[#171717]/45">
-                  机身二维码丢失、蓝牙连不上时，手机连 {HOTSPOT_SSID} 热点即可配网
-                </span>
-              </span>
-            </span>
-            <ArrowRight size={17} className="shrink-0 text-[#171717]/40" />
-          </button>
-        </section>
-
-        <section className="rounded-lg border border-[#171717]/10 bg-white p-4">
+        <section className="rounded-lg p-4">
           <p className="m-0 flex items-center gap-2 text-sm font-medium">
             <Info size={18} /> 关于
           </p>
@@ -148,7 +127,7 @@ export function SettingsView() {
         <button
           type="button"
           onClick={signOut}
-          className="mt-1 flex items-center justify-center gap-2 rounded-lg border border-[#171717]/15 bg-white py-3 text-sm font-medium text-[#b3261e] hover:bg-[#b3261e]/5"
+          className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#171717]/5 py-3 text-sm font-medium text-[#b3261e] hover:bg-[#b3261e]/8"
         >
           <LogOut size={17} /> 退出登录
         </button>

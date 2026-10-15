@@ -57,8 +57,9 @@ Capacitor 8 打包 Android（appId `com.pawlink.petwater`，appName `silifield`�
   没有「模拟扫码」按钮、没有手输二维码、没有演示网络快填。
 - 设备侧能力（相机解码 / BLE 传输 / AP 探测）统一收在 `src/config.ts` 的 `simulateHardware` 开关后，
   接入真机时关掉即可，页面与状态机不动。
-- 保底配网入口只有两处：**配网失败后自动弹出的提示层**（仅 scan 通道）与**设置页「配网遇到问题」**。
-  首页头部不得再出现保底配网按钮。
+- 保底配网入口**唯一**：**配网失败后自动弹出的提示层**（仅 scan 通道，FallbackSheet）。
+  设置页「配网遇到问题」模块已删除（用户明确：保底只在配网失败后自动出现，不做常驻入口）。
+  首页头部不得出现保底配网按钮。
 - 原型阶段唯一能自然走到的失败：WiFi 名称以 `5G` 结尾 → `WIFI_UNSUPPORTED_BAND`（`isFiveGhzSsid()`）。
 
 ## 安全区与适配
