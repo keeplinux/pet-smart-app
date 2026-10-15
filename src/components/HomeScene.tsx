@@ -9,7 +9,8 @@ const UP_VECTOR = new THREE.Vector3(0, 1, 0)
 /** 初始默认视角：45° 斜俯视，海平面构图（用户可用拖动/缩放覆盖并自动记忆） */
 const DEFAULT_CAMERA = { x: 0, y: 5.6, z: 5.6 }
 const VIEW_STORAGE_KEY = 'pet-smart-app:home-view'
-const MAX_DISTANCE = 9.6
+/** 最远可缩小到星球约为默认视觉大小（距离 7.92）的 10% */
+const MAX_DISTANCE = 79.2
 const COMPOSE_FACTOR = 0.192
 /** 直接操纵手感：拖动星球本身的灵敏度（拖满一屏高度约转 0.35 × 2π 弧度） */
 const PLANET_DRAG_SPEED = 0.35
@@ -102,7 +103,7 @@ export function HomeScene({
       45,
       (mount.clientWidth || 320) / (mount.clientHeight || 480),
       0.1,
-      100,
+      300, // 远裁剪面须覆盖 MAX_DISTANCE + 星空半径（79 + 50）
     )
     // 45° 斜俯视看向星球中心；若用户此前调整过视角（自动记忆），直接恢复其最优视角
     const savedView = readSavedView()
