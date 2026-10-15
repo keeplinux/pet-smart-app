@@ -8,7 +8,8 @@ const UP_VECTOR = new THREE.Vector3(0, 1, 0)
 
 /** 初始默认视角：45° 斜俯视，海平面构图（用户可用拖动/缩放覆盖并自动记忆） */
 const DEFAULT_CAMERA = { x: 0, y: 5.6, z: 5.6 }
-const VIEW_STORAGE_KEY = 'pet-smart-app:home-view'
+// v2：升级 key 使旧版残留的视角/星球姿态记忆失效，回到默认构图
+const VIEW_STORAGE_KEY = 'pet-smart-app:home-view-v2'
 /** 最远可缩小到星球约为默认视觉大小（距离 7.92）的 10% */
 const MAX_DISTANCE = 79.2
 const COMPOSE_FACTOR = 0.192
@@ -375,7 +376,8 @@ export function HomeScene({
 
     state.cats = cats
     state.deviceGroups = deviceGroups
-    state.hasWater = devices.some((device) => device.kind === 'water')
+    // 只有已绑定的饮水机才有活水，猫会前去喝水；未绑定的空设备不会吸引猫
+    state.hasWater = devices.some((device) => device.kind === 'water' && device.status === 'bound')
   }, [pets, devices])
 
   return <div ref={mountRef} className="h-full w-full" />

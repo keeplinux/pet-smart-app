@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Camera, ChevronLeft, Pause, Play, Video, Wifi } from 'lucide-react'
+import { Camera, ChevronLeft, Pause, Play, QrCode, Video, Wifi } from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
 import { WaterDataAnalysis } from '../components/WaterDataAnalysis'
-import { smartWaterDeviceData as data } from '../deviceData'
+import { buildSmartWaterData } from '../deviceData'
 import { payloadFromDevice } from '../provisioning'
+import type { Pet } from '../nav'
 
 /** 一段录像：start 为当天起始分钟，duration 单位分钟 */
 type RecordClip = {
@@ -30,93 +31,95 @@ function dateKeyOf(d: Date) {
   ).padStart(2, '0')}`
 }
 
-/** 演示录像数据：近三天，宇宙叙事风格的片段命名；真实单次饮水时长不超过 3 分钟 */
-function buildRecordDays(): RecordDay[] {
-  const now = new Date()
-  const back = (days: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - days)
-  return [
-    {
-      dateKey: dateKeyOf(back(0)),
-      label: '今天',
-      clips: [
-        {
-          start: 6 * 60 + 47,
-          duration: 2,
-          title: '清晨巡航饮水',
-          petName: '糯米',
-          waterMl: 85,
-          photo: '/clips/clip-nuomi-day.jpg',
-        },
-        {
-          start: 8 * 60 + 12,
-          duration: 3,
-          title: '早餐补给饮水',
-          petName: '团子',
-          waterMl: 120,
-          photo: '/clips/clip-tuanzi.jpg',
-        },
-        {
-          start: 21 * 60 + 5,
-          duration: 2,
-          title: '夜间巡航饮水',
-          petName: '糯米',
-          waterMl: 60,
-          photo: '/clips/clip-nuomi-night.jpg',
-        },
-      ],
-    },
-    {
-      dateKey: dateKeyOf(back(1)),
-      label: '昨天',
-      clips: [
-        {
-          start: 9 * 60 + 30,
-          duration: 2,
-          title: '上午远征饮水',
-          petName: '糯米',
-          waterMl: 95,
-          photo: '/clips/clip-nuomi-day.jpg',
-        },
-        {
-          start: 15 * 60 + 30,
-          duration: 3,
-          title: '午后探索饮水',
-          petName: '团子',
-          waterMl: 110,
-          photo: '/clips/clip-tuanzi.jpg',
-        },
-      ],
-    },
-    {
-      dateKey: dateKeyOf(back(2)),
-      label: '前天',
-      clips: [
-        {
-          start: 7 * 60 + 15,
-          duration: 1,
-          title: '晨间巡游饮水',
-          petName: '团子',
-          waterMl: 75,
-          photo: '/clips/clip-tuanzi.jpg',
-        },
-        {
-          start: 20 * 60 + 40,
-          duration: 2,
-          title: '傍晚星航饮水',
-          petName: '糯米',
-          waterMl: 100,
-          photo: '/clips/clip-nuomi-night.jpg',
-        },
-      ],
-    },
-  ]
+/** 演示照片素材（按宠物与片段轮换） */
+const clipPhotos = [
+  '/clips/clip-nuomi-day.jpg',
+  '/clips/clip-tuanzi.jpg',
+  '/clips/clip-nuomi-night.jpg',
+]
+
+/** 片段命名（宇宙叙事风格），按哈希稳定挑选 */
+const clipTitles = [
+  '清晨巡航饮水',
+  '早餐补给饮水',
+  '上午远征饮水',
+  '午后探索饮水',
+  '傍晚星航饮水',
+  '夜间巡航饮水',
+  '晨间巡游饮水',
+]
+
+/** 常见饮水时段（起始小时）：猫早晚饮水高峰 */
+const clipHours = [6, 7, 8, 9, 15, 16, 20, 21]
+
+function hashSeed(text: string): number {
+  let hash = 0
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) % 0xffffffff
+  }
+  return hash || 1
 }
 
-const recordDays = buildRecordDays()
+/** mulberry32：确定性伪随机，同一宠物跨会话生成相同的录像记录 */
+function makeRandom(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * 按实际录入的宠物生成近三天演示录像：宠物数量与名字和实际绑定数量一致
+ * （0 只 → 空数组，录像区展示空态）；单次饮水时长不超过 3 分钟。
+ */
+function buildRecordDays(pets: Pet[]): RecordDay[] {
+  if (pets.length === 0) {
+    return []
+  }
+  const now = new Date()
+  const back = (days: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - days)
+  return [0, 1, 2].map((dayOffset) => {
+    const clips: RecordClip[] = []
+    pets.forEach((pet, petIndex) => {
+      const rand = makeRandom(hashSeed(`${pet.id}:${pet.name}:${dayOffset}`))
+      const count = rand() < 0.65 ? 2 : 1
+      const usedHours = new Set<number>()
+      for (let i = 0; i < count; i += 1) {
+        let hour = clipHours[Math.floor(rand() * clipHours.length)]
+        // 同一只宠物同一天的两段录像错开时段
+        while (usedHours.has(hour)) {
+          hour = clipHours[Math.floor(rand() * clipHours.length)]
+        }
+        usedHours.add(hour)
+        clips.push({
+          start: hour * 60 + Math.floor(rand() * 50),
+          duration: 1 + Math.floor(rand() * 3),
+          title: clipTitles[Math.floor(rand() * clipTitles.length)],
+          petName: pet.name,
+          waterMl: 60 + Math.floor(rand() * 61),
+          photo: clipPhotos[(petIndex + i) % clipPhotos.length],
+        })
+      }
+    })
+    clips.sort((a, b) => a.start - b.start)
+    return {
+      dateKey: dateKeyOf(back(dayOffset)),
+      label: dayOffset === 0 ? '今天' : dayOffset === 1 ? '昨天' : '前天',
+      clips,
+    }
+  })
+}
 
 export function DeviceView({ deviceId }: { deviceId: string }) {
-  const { navigate, devices } = useApp()
+  const { navigate, devices, pets } = useApp()
   const device = devices.find((item) => item.id === deviceId)
+  // 设备数据按实际录入的宠物生成（数量一致；未录入时为空数据）
+  const data = useMemo(() => buildSmartWaterData(pets), [pets])
+  const recordDays = useMemo(() => buildRecordDays(pets), [pets])
   const [flowOn, setFlowOn] = useState(data.flowEnabled)
   const [lightOn, setLightOn] = useState(data.lightEnabled)
 
@@ -135,7 +138,26 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
     <>
       <TopBar title={device.name} onBack={() => navigate({ name: 'home' })} />
       <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 safe-bottom">
-        {device.status === 'pending' ? (
+        {device.status === 'unbound' ? (
+          <div className="flex flex-col gap-2.5 rounded-lg bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <QrCode size={16} className="mt-0.5 shrink-0 text-amber-600" />
+              <div className="min-w-0">
+                <p className="m-0 text-sm font-medium text-amber-800">该设备尚未绑定</p>
+                <p className="m-0 mt-0.5 text-xs leading-5 text-amber-700">
+                  扫描机身二维码完成绑定与配网，饮水数据将按已录入的宠物自动生成。
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate({ name: 'scan' })}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-[#171717] text-sm font-medium text-white hover:bg-[#171717]/85"
+            >
+              <QrCode size={15} /> 扫码绑定
+            </button>
+          </div>
+        ) : device.status === 'pending' ? (
           <div className="flex flex-col gap-2.5 rounded-lg bg-amber-50 px-4 py-3">
             <div className="flex items-start gap-2">
               <Wifi size={16} className="mt-0.5 shrink-0 text-amber-600" />
@@ -171,9 +193,10 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
           </div>
         )}
 
-        {device.kind === 'water' ? (
+        {/* 数据区仅绑定后展示；未绑定设备数据为空，只保留绑定引导 */}
+        {device.status !== 'unbound' && device.kind === 'water' ? (
           <>
-            <WaterDataAnalysis />
+            <WaterDataAnalysis pets={pets} />
 
             <div className="flex items-center justify-center gap-12">
               <Metric label="剩余水量" value={`${data.waterLevelPercent}%`} sub={data.waterLevelText} />
@@ -194,26 +217,39 @@ export function DeviceView({ deviceId }: { deviceId: string }) {
               <ToggleRow label="氛围灯" value={lightOn} onChange={setLightOn} />
             </section>
 
-            <CameraSection />
+            <CameraSection recordDays={recordDays} />
           </>
-        ) : (
+        ) : device.kind !== 'water' ? (
           <section className="rounded-lg border border-[#171717]/10 bg-white p-4">
             <p className="m-0 text-sm font-medium">控制界面待接入</p>
             <p className="m-0 mt-1 text-xs text-[#171717]/45">
               {device.name} 的控制功能将在后续版本提供
             </p>
           </section>
-        )}
+        ) : null}
       </main>
     </>
   )
 }
 
-function CameraSection() {
+function CameraSection({ recordDays }: { recordDays: RecordDay[] }) {
   const [tab, setTab] = useState<'live' | 'history'>('live')
   const [selectedDay, setSelectedDay] = useState<RecordDay | null>(null)
   const [pendingStart, setPendingStart] = useState<number | null>(null)
   const today = recordDays[0]
+
+  // 未录入宠物：没有录像记录，整块展示空态
+  if (!today) {
+    return (
+      <section className="rounded-lg border border-dashed border-[#171717]/15 bg-white px-4 py-10 text-center">
+        <Video size={26} className="mx-auto text-[#171717]/25" />
+        <p className="m-0 mt-2 text-sm font-medium text-[#171717]/60">暂无饮水录像</p>
+        <p className="m-0 mt-1 text-xs text-[#171717]/45">
+          录入宠物数字形象后，饮水舱将自动记录宠物的饮水片段
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="py-1">
@@ -488,16 +524,16 @@ function HistoryPlayer({
   return (
     <div className="flex flex-col gap-3">
       <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-[#171717]">
-      <span className="absolute left-3 top-3 flex items-center gap-2">
-        <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#171717]">
-          {day.label} {fmtMinute(minute)}
-        </span>
-        {activeClip && (
+        <span className="absolute left-3 top-3 flex items-center gap-2">
           <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#171717]">
-            {activeClip.title}
+            {day.label} {fmtMinute(minute)}
           </span>
-        )}
-      </span>
+          {activeClip && (
+            <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#171717]">
+              {activeClip.title}
+            </span>
+          )}
+        </span>
 
       <button
         type="button"
@@ -581,8 +617,8 @@ function HistoryPlayer({
             </div>
           </div>
           <span className="pointer-events-none absolute left-1/2 top-0 h-10 w-0.5 -translate-x-1/2 rounded-full bg-white" />
-          </div>
         </div>
+      </div>
       </div>
 
       {/* 当天饮水片段截取列表：点击定位到时间轴对应位置 */}

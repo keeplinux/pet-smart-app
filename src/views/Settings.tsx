@@ -7,6 +7,7 @@ import {
   Info,
   LoaderCircle,
   LogOut,
+  QrCode,
   Radar,
   Trash2,
   TriangleAlert,
@@ -141,9 +142,9 @@ export function SettingsView() {
                   <div className="flex shrink-0 items-center gap-2">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        device.status === 'pending'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-[#171717]/5 text-[#171717]/55'
+                        device.status === 'bound'
+                          ? 'bg-[#171717]/5 text-[#171717]/55'
+                          : 'bg-amber-100 text-amber-700'
                       }`}
                     >
                       {statusLabel[device.status]}
@@ -158,6 +159,15 @@ export function SettingsView() {
                     </button>
                   </div>
                 </div>
+                {device.status === 'unbound' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate({ name: 'scan' })}
+                    className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#171717]/5 text-xs font-medium hover:bg-[#171717]/10"
+                  >
+                    <QrCode size={14} /> 扫码绑定
+                  </button>
+                )}
                 {device.status === 'pending' && (
                   <button
                     type="button"

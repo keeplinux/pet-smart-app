@@ -1,14 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { Pet } from '../nav'
 import type { PetWaterSeries, WaterStatPeriod } from '../waterStats'
-import { periodTabLabels, periodTicks, waterStatPets } from '../waterStats'
+import { buildWaterStatPets, periodPoints, periodTabLabels, periodTicks } from '../waterStats'
 
 const periods: WaterStatPeriod[] = ['day', 'week', 'month']
 
-export function WaterDataAnalysis() {
+export function WaterDataAnalysis({ pets }: { pets: Pet[] }) {
   const [period, setPeriod] = useState<WaterStatPeriod>('day')
   const [hiddenPets, setHiddenPets] = useState<Set<string>>(new Set())
 
-  const visiblePets = waterStatPets.filter((pet) => !hiddenPets.has(pet.petId))
+  // 序列按实际录入的宠物生成：数量一致、数值按宠物哈希稳定
+  const statPets = useMemo(() => buildWaterStatPets(pets), [pets])
+
+  if (statPets.length === 0) {
+    return (
+      <section className="rounded-lg border border-dashed border-[#171717]/15 bg-white px-4 py-10 text-center">
+        <p className="m-0 text-sm font-medium text-[#171717]/60">暂无宠物饮水数据</p>
+        <p className="m-0 mt-1 text-xs text-[#171717]/45">
+          录入宠物数字形象后，饮水数据将按宠物自动生成
+        </p>
+      </section>
+    )
+  }
+
+  const visiblePets = statPets.filter((pet) => !hiddenPets.has(pet.petId))
   const allValues = visiblePets.flatMap((pet) => pet.series[period])
   const yMax = Math.max(10, Math.ceil(Math.max(...allValues) / 50) * 50)
 
@@ -46,7 +61,7 @@ export function WaterDataAnalysis() {
       <WaterChart pets={visiblePets} period={period} yMax={yMax} />
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {waterStatPets.map((pet) => {
+        {statPets.map((pet) => {
           const hidden = hiddenPets.has(pet.petId)
           return (
             <button
@@ -84,7 +99,8 @@ function WaterChart({
   const padBottom = 20
   const innerWidth = width - padX * 2
   const innerHeight = height - padTop - padBottom
-  const pointCount = waterStatPets[0].series[period].length
+  // 数据点数按周期固定，不依赖具体宠物（避免 0 只宠物时取值崩溃）
+  const pointCount = periodPoints[period]
   const ticks = periodTicks[period]
   const slotW = innerWidth / pointCount
   const barGap = 1.5

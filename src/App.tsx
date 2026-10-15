@@ -18,13 +18,15 @@ import { ScanView } from './views/Scan'
 import { SettingsView } from './views/Settings'
 import { Splash } from './views/Splash'
 
+// 初始状态：星球上预置一台未绑定饮水舱（与一只待录入的猫），
+// 首次扫描饮水机二维码即默认绑定这台设备，数据在绑定后按已录入宠物生成
 const initialDevices: Device[] = [
   buildDevice({
     productId: 'smart-water',
     sn: 'PF24050007',
     mac: 'A4:C1:38:2B:71:0C',
-    wifiSsid: 'Silifield-Office',
-    status: 'bound',
+    wifiSsid: null,
+    status: 'unbound',
     source: 'scan',
   }),
 ]
@@ -72,6 +74,18 @@ function App() {
     setDevices((prev) => {
       const index = prev.findIndex((device) => device.sn === input.sn)
       if (index === -1) {
+        // 首次绑定预置设备：星球上未绑定的同型号设备就是这台，原位升级绑定而不新增一台
+        const unboundIndex =
+          input.status === 'bound'
+            ? prev.findIndex(
+                (device) => device.productId === input.productId && device.status === 'unbound',
+              )
+            : -1
+        if (unboundIndex !== -1) {
+          const next = [...prev]
+          next[unboundIndex] = buildDevice(input)
+          return next
+        }
         const next = [...prev]
         // 新设备自动插到饮水舱（预置主设备，恒为首位）正下方
         next.splice(Math.min(1, next.length), 0, buildDevice(input))
@@ -90,7 +104,11 @@ function App() {
         return prev
       }
       const next = [...prev]
-      next[index] = { ...buildDevice(input), boundAt: current.boundAt }
+      // 已绑定设备保持原绑定时间；未绑定/待配网记录升级时绑定时间取当前时刻
+      next[index] =
+        current.status === 'bound'
+          ? { ...buildDevice(input), boundAt: current.boundAt }
+          : buildDevice(input)
       return next
     })
   }, [])

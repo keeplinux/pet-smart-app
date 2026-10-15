@@ -151,6 +151,7 @@ export const sourceLabel: Record<ProvisionSource, string> = {
 }
 
 export const statusLabel: Record<DeviceStatus, string> = {
+  unbound: '未绑定',
   bound: '已配网',
   pending: '待配网',
 }

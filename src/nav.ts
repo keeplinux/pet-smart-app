@@ -30,10 +30,11 @@ export type DeviceKind = 'water' | 'feeder' | 'litter' | 'camera' | 'tracker' | 
 export type ProvisionSource = 'scan' | 'hotspot'
 
 /**
+ * unbound：星球上预置的未绑定设备（占位），首次扫码同型号产品即绑定这台设备
  * bound：已完成配网并绑定
  * pending：通过保底热点发现，等待用户手动配网
  */
-export type DeviceStatus = 'bound' | 'pending'
+export type DeviceStatus = 'unbound' | 'bound' | 'pending'
 
 export type Device = {
   id: string

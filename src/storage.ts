@@ -1,7 +1,8 @@
 import type { Device, Pet } from './nav'
 import { products } from './catalog'
 
-const deviceStorageKey = 'pet-smart-app:devices'
+// v2：设备初始状态重构（预置未绑定饮水机），升级 key 使旧设备数据失效、回到新初始态
+const deviceStorageKey = 'pet-smart-app:devices-v2'
 const petStorageKey = 'pet-smart-app:pets'
 
 /** 历史产品名：持久化设备若仍带着旧名，读取时迁移为 catalog 当前名 */
@@ -25,7 +26,7 @@ function isDevice(value: unknown): value is Device {
     typeof item.productId === 'string' &&
     typeof item.name === 'string' &&
     typeof item.sn === 'string' &&
-    (item.status === 'bound' || item.status === 'pending')
+    (item.status === 'unbound' || item.status === 'bound' || item.status === 'pending')
   )
 }
 
