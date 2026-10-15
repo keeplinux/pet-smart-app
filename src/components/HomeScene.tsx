@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import type { Device, DeviceKind } from '../nav'
+import type { Device, DeviceKind, Pet } from '../nav'
 
 const PLANET_RADIUS = 2.4
 const UP_VECTOR = new THREE.Vector3(0, 1, 0)
@@ -15,6 +15,7 @@ const COMPOSE_FACTOR = 0.192
 /** 直接操纵手感：拖动星球本身的灵敏度（拖满一屏高度约转 0.35 × 2π 弧度） */
 const PLANET_DRAG_SPEED = 0.35
 
+/** 首页星球固定猫色系（与录入宠物解绑，保持原始布局观感；录入形象仅在档案页展示） */
 const catColors = ['#e08a4e', '#7f9cf5', '#b47ad4', '#5bb5a0']
 
 const catStart: [number, number][] = [
@@ -72,14 +73,14 @@ type SceneState = {
 }
 
 export function HomeScene({
-  petCount,
+  pets,
   devices,
   onCatClick,
   onDeviceClick,
 }: {
-  petCount: number
+  pets: Pet[]
   devices: Device[]
-  onCatClick: () => void
+  onCatClick: (petIndex: number) => void
   onDeviceClick: (deviceId: string) => void
 }) {
   const mountRef = useRef<HTMLDivElement>(null)
@@ -249,8 +250,9 @@ export function HomeScene({
         onDeviceClickRef.current(deviceId)
         return
       }
-      if (findCat(hits[0].object)) {
-        onCatClickRef.current()
+      const catIndex = findCatIndex(hits[0].object, state.cats)
+      if (catIndex >= 0) {
+        onCatClickRef.current(catIndex)
       }
     }
 
@@ -350,7 +352,7 @@ export function HomeScene({
     state.contentGroup.clear()
 
     const cats: CatRig[] = []
-    const catCount = Math.max(1, petCount)
+    const catCount = Math.max(1, pets.length)
     for (let i = 0; i < catCount; i++) {
       const cat = createCat(catColors[i % catColors.length], i)
       cats.push(cat)
@@ -374,7 +376,7 @@ export function HomeScene({
     state.cats = cats
     state.deviceGroups = deviceGroups
     state.hasWater = devices.some((device) => device.kind === 'water')
-  }, [petCount, devices])
+  }, [pets, devices])
 
   return <div ref={mountRef} className="h-full w-full" />
 }
@@ -497,13 +499,14 @@ function findDeviceId(object: THREE.Object3D): string | null {
   return null
 }
 
-function findCat(object: THREE.Object3D): boolean {
+function findCatIndex(object: THREE.Object3D, cats: CatRig[]): number {
   let current: THREE.Object3D | null = object
   while (current) {
-    if (current.userData.cat) return true
+    const index = cats.findIndex((cat) => cat.group === current)
+    if (index >= 0) return index
     current = current.parent
   }
-  return false
+  return -1
 }
 
 function placeOnPlanet(object: THREE.Object3D, theta: number, phi: number) {

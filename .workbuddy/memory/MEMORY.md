@@ -1,5 +1,10 @@
 # Pet Smart App · 项目约定
 
+## 交付流程约定（用户 2026-10-15 要求）
+**默认只做：改代码 + 校验（tsc/eslint）+ 升版本号 + 记版本变更日志 + 打开 dev 预览。**
+**不主动做：打包 APK、git commit/push**——只在用户明确要求时才执行（用户会说"需要的时候告诉你"）。
+预览用后台 `npm run dev`（端口通常 5173/5174）+ `preview-phone.html`，present_files 打开。
+
 ## 宇宙叙事（核心产品设定，用户要求牢记）
 硅宠场域（silifield）的宇宙世界观：**猫咪是宇航员、星球探索者**；宠物饮水机是**「饮水舱」**
 （产品名已改，旧名「智能饮水机」「宠物暖泉」不得再出现在 UI 文案里）。
@@ -13,8 +18,12 @@
 - 打包链：`npm run build` → `npx cap sync android` → `cd android && JAVA_HOME=<jdk21> ./gradlew assembleRelease`。
   JDK 21 在 `catwater/android-build-tools/jdk21/jdk-21.0.11+10`，SDK 在 `catwater/android-sdk`。
 - 版本号两处同步改：`package.json` 与 `android/app/build.gradle`（versionCode 递增）；APK 复制到根目录命名 `silifield-v<版本>.apk`。
-- 商标 logo 素材：`素材/硅宠场域商标logo.png`（1024 白底，图形深墨绿 #153C2A 区域）；App 图标由
-  `AppData/Local/Temp/logo-work/gen_icons.py` 脚本生成（mipmap 全密度 + splash 全方向 + `public/brand/logo.png`）。
+- 商标 logo 素材：`素材/硅宠场域商标logo.png`（1024 白底，图形深墨绿 #153C2A）。
+  **v1.2.2 起安卓图标/启动页统一从 LogoMark 矢量路径渲染**（与 App 内 logo 像素级一致，
+  IoU 0.9955）：`logo-work/extract_polygons.js`（路径→多边形，注意 SVG 隐式连续坐标）→
+  `render_icons.py`（纯 PIL even-odd 扫描线 + 4× 超采样），生成 mipmap 全密度
+  ic_launcher(_round)（白底 ∞ 74%）/ foreground（透明 ∞ 48%）/ splash 全 11 张。
+  预览：根目录 `icon-preview.html`。
 
 ## 首页 3D 星球（HomeScene.tsx 关键机制）
 - **拖动 = 直接操纵转球**（v1.1.2 起，用户要求方向一致手感）：星空是背景幕不转；planet+内容在

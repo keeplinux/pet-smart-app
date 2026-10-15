@@ -10,6 +10,7 @@ export type View =
   | { name: 'avatarPicker' }
   | { name: 'device'; deviceId: string }
   | { name: 'petCapture' }
+  | { name: 'petProfile'; petId: string }
 
 export type AccountMethod = 'phone' | 'wechat'
 
@@ -71,15 +72,52 @@ export type QrPayload = {
   token: string
 }
 
+/** 产品型号/配色变体（商城卡片内横向滑动浏览） */
+export type ProductVariant = {
+  /** 型号（如 标准版 / 大容量版） */
+  model: string
+  /** 配色名（宇宙叙事命名，如 星舰白 / 星云紫） */
+  color: string
+  /** 展示氛围底色 */
+  bg: string
+}
+
 export type Product = {
   id: string
   name: string
   category: string
   description: string
   image: string
+  variants: ProductVariant[]
 }
 
+export type PetGender = 'male' | 'female'
+
+/** 服务器构建回传的宠物模型参数（demo 阶段为假回传，本地生成） */
+export type PetModelSeed = {
+  /** 主体色（#rrggbb） */
+  color: string
+  /** 体型系数 0.85 - 1.25 */
+  scale: number
+  /** 花纹：纯色 / 白袜子 / 补丁 */
+  pattern: 'solid' | 'socks' | 'patch'
+}
+
+/** 录入媒体：四视图照片（正/左/右/背，dataURL 持久化）或环绕视频（会话内 blobURL） */
+export type PetMedia =
+  | { kind: 'photos'; front: string; left: string; right: string; back: string }
+  | { kind: 'video'; url: string }
+
 export type Pet = {
+  id: string
   name: string
-  imageUrl: string | null
+  /** 生日 YYYY-MM-DD */
+  birthday: string
+  gender: PetGender
+  /** 品种：云服务器按录入媒体自动识别回传（demo 阶段为模拟识别） */
+  breed: string
+  /** 录入的照片/视频（确保全面收集宠物外表信息） */
+  media: PetMedia | null
+  /** 模型构建参数（上传后服务器回传） */
+  model: PetModelSeed
 }

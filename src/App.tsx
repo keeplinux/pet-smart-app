@@ -5,13 +5,14 @@ import type { AppApi } from './appContext'
 import { clearStoredAccount, readStoredAccount, storeAccount } from './auth'
 import type { Account, Device, DeviceInput, Pet, View } from './nav'
 import { buildDevice } from './provisioning'
-import { clearStoredDevices, readStoredDevices, storeDevices } from './storage'
+import { clearStoredDevices, clearStoredPets, readStoredDevices, readStoredPets, storeDevices, storePets } from './storage'
 import { AvatarPickerView } from './views/AvatarPicker'
 import { DeviceView } from './views/Device'
 import { Home } from './views/Home'
 import { HotspotBindView } from './views/HotspotBind'
 import { Mall } from './views/Mall'
 import { PetCapture } from './views/PetCapture'
+import { PetProfileView } from './views/PetProfile'
 import { PurchaseView } from './views/Purchase'
 import { ScanView } from './views/Scan'
 import { SettingsView } from './views/Settings'
@@ -52,6 +53,8 @@ function renderView(view: View): ReactNode {
       return <DeviceView deviceId={view.deviceId} />
     case 'petCapture':
       return <PetCapture />
+    case 'petProfile':
+      return <PetProfileView petId={view.petId} />
     default:
       return <Home />
   }
@@ -61,7 +64,7 @@ function App() {
   const [account, setAccount] = useState<Account | null>(() => readStoredAccount())
   const [view, setView] = useState<View>(() => (readStoredAccount() ? { name: 'home' } : { name: 'splash' }))
   const [devices, setDevices] = useState<Device[]>(() => readStoredDevices(initialDevices))
-  const [pets, setPets] = useState<Pet[]>([])
+  const [pets, setPets] = useState<Pet[]>(() => readStoredPets())
 
   const navigate = useCallback((next: View) => setView(next), [])
 
@@ -123,7 +126,9 @@ function App() {
   const signOut = useCallback(() => {
     clearStoredAccount()
     clearStoredDevices()
+    clearStoredPets()
     setAccount(null)
+    setPets([])
     setView({ name: 'splash' })
   }, [])
 
@@ -131,6 +136,11 @@ function App() {
   useEffect(() => {
     storeDevices(devices)
   }, [devices])
+
+  // 宠物档案持久化（含服务器回传的模型参数）
+  useEffect(() => {
+    storePets(pets)
+  }, [pets])
 
   const api = useMemo<AppApi>(
     () => ({

@@ -23,9 +23,16 @@ export function Home() {
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="absolute inset-0">
         <HomeScene
-          petCount={pets.length > 0 ? pets.length : 1}
+          pets={pets}
           devices={devices}
-          onCatClick={() => navigate({ name: 'petCapture' })}
+          onCatClick={(petIndex) => {
+            const pet = pets[petIndex]
+            if (pet) {
+              navigate({ name: 'petProfile', petId: pet.id })
+              return
+            }
+            navigate({ name: 'petCapture' })
+          }}
           onDeviceClick={(deviceId) => navigate({ name: 'device', deviceId })}
         />
       </div>
