@@ -19,6 +19,8 @@ export type Account = {
   identifier: string
   /** 用户资料头像（预设形象 id），见 src/avatars.ts */
   avatarId?: string
+  /** 用户自定义头像（本地相册/相机，压缩后的方形 dataURL），优先于 avatarId */
+  avatarImage?: string
 }
 
 export type DeviceKind = 'water' | 'feeder' | 'litter' | 'camera' | 'tracker' | 'generic'

@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Bell, ChevronRight, Info, LogOut, Radar, Trash2, TriangleAlert, Wifi } from 'lucide-react'
 import { useApp } from '../appContext'
 import { TopBar } from '../components/TopBar'
+import { AvatarBadge } from '../components/AvatarBadge'
 import { payloadFromDevice, statusLabel } from '../provisioning'
-import { getAvatarPreset } from '../avatars'
 import type { Device } from '../nav'
 
 export function SettingsView() {
@@ -21,18 +21,7 @@ export function SettingsView() {
             onClick={() => navigate({ name: 'avatarPicker' })}
             className="flex w-full items-center gap-3 rounded-lg p-4 text-left hover:bg-[#171717]/3"
           >
-            {(() => {
-              const preset = getAvatarPreset(account?.avatarId)
-              const Icon = preset.icon
-              return (
-                <span
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
-                  style={{ backgroundColor: preset.bg, color: preset.fg }}
-                >
-                  <Icon size={21} strokeWidth={1.8} />
-                </span>
-              )
-            })()}
+            <AvatarBadge account={account} size={44} />
             <div className="min-w-0 flex-1">
               <p className="m-0 text-sm font-medium">用户账号</p>
               {account ? (
